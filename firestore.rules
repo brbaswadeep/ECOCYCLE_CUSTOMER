@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Customers
+    match /customers/{userId} {
+      allow read: if isAuthenticated(); // Vendors need to read to display info
+      allow create: if isAuthenticated(); // Allow creation (e.g. on signup)
+      allow update: if isOwner(userId); // Users update their own profile
+      allow delete: if false; // Deletion restricted
+    }
+
+    // Vendors
+    match /vendors/{userId} {
+      allow read: if isAuthenticated(); // Customers search vendors
+      allow create: if isAuthenticated();
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // Requests
+    match /requests/{requestId} {
+      allow create: if isAuthenticated();
+      
+      // Read: Owner OR if user is in the list of vendors
+      allow read: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid || 
+        request.auth.uid in resource.data.vendorIds ||
+        resource.data.acceptedBy == request.auth.uid
+      );
+      
+      // Update: Owner can update? Vendors can update status
+      allow update: if isAuthenticated() && (
+        resource.data.customerId == request.auth.uid ||
+        request.auth.uid in resource.data.vendorIds ||
+        resource.data.acceptedBy == request.auth.uid
+      );
+    }
+
+    // Chats
+    // We validate access based on the Request (Order) logic
+    // Chats Parent Document (for Listing)
+    match /chats/{chatId} {
+      allow read, list: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated(); // Allow creation of the chat metadata
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants;
+    }
+
+    // Chat Messages
+    match /chats/{orderId}/messages/{messageId} {
+      allow read, list: if isAuthenticated() && (
+         get(/databases/$(database)/documents/requests/$(orderId)).data.customerId == request.auth.uid ||
+         request.auth.uid in get(/databases/$(database)/documents/requests/$(orderId)).data.vendorIds ||
+         get(/databases/$(database)/documents/requests/$(orderId)).data.acceptedBy == request.auth.uid
+      );
+      
+      allow create: if isAuthenticated() && (
+         get(/databases/$(database)/documents/requests/$(orderId)).data.customerId == request.auth.uid ||
+         request.auth.uid in get(/databases/$(database)/documents/requests/$(orderId)).data.vendorIds ||
+         get(/databases/$(database)/documents/requests/$(orderId)).data.acceptedBy == request.auth.uid
+      );
+    }
+  }
+}
