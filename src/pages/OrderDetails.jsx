@@ -88,8 +88,18 @@ export default function OrderDetails() {
     if (!order) return null;
 
     // Calculate Days Left
-    const daysLeft = order.projectMeta?.estimatedCompletion ?
-        Math.ceil((new Date(order.projectMeta.estimatedCompletion) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+    const getCompletionDate = () => {
+        if (!order.projectMeta?.estimatedCompletion) return null;
+        // Handle Firestore Timestamp or Date string/object
+        const date = order.projectMeta.estimatedCompletion.toDate
+            ? order.projectMeta.estimatedCompletion.toDate()
+            : new Date(order.projectMeta.estimatedCompletion);
+        return date;
+    };
+
+    const completionDate = getCompletionDate();
+    const daysLeft = completionDate ?
+        Math.ceil((completionDate - new Date()) / (1000 * 60 * 60 * 24)) : null;
 
     const isCompleted = order.projectMeta?.trackingStage === 'completed';
     const currentStageIdx = TRACKING_STAGES.findIndex(s => s.id === order.projectMeta?.trackingStage);
@@ -121,7 +131,7 @@ export default function OrderDetails() {
                             <div className="text-xl font-medium opacity-80">{Math.max(0, daysLeft) === 1 ? 'Day' : 'Days'} Remaining</div>
                             <div className="mt-4 inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full text-sm">
                                 <Calendar className="w-4 h-4" />
-                                {new Date(order.projectMeta.estimatedCompletion).toLocaleDateString()}
+                                {completionDate ? completionDate.toLocaleDateString() : 'Date pending'}
                             </div>
                         </div>
                     </div>
