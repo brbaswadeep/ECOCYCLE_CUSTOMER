@@ -50,11 +50,22 @@ export default function Dashboard() {
             const querySnapshot = await getDocs(q);
             const requests = [];
             let totalItems = 0;
+            let totalCO2 = 0;
+            let totalLandfill = 0;
+            let totalEnergy = 0;
 
             querySnapshot.forEach(doc => {
                 const data = doc.data();
                 requests.push({ id: doc.id, ...data });
-                totalItems += 1; // Assuming 1 request = 1 item or group
+                totalItems += 1;
+                
+                // Aggregate real environmental impact data
+                if (data.itemDetails?.analysis?.environmental_impact) {
+                    const impact = data.itemDetails.analysis.environmental_impact;
+                    totalCO2 += impact.co2_saved_kg || impact.CO2_saved_kg || 0;
+                    totalLandfill += impact.landfill_diverted_kg || 0;
+                    totalEnergy += impact.energy_saved_kwh || 0;
+                }
             });
 
             // Sort by date desc
@@ -62,7 +73,7 @@ export default function Dashboard() {
 
             setStats({
                 itemsRecycled: totalItems,
-                co2Saved: (totalItems * 0.5).toFixed(1), // Mock: 0.5kg per item
+                co2Saved: totalCO2.toFixed(1),
                 points: totalItems * 50 // Mock: 50 pts per item
             });
 

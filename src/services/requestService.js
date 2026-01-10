@@ -52,8 +52,13 @@ export const createVendorRequest = async (customerId, customerLocation, itemDeta
     try {
         const requestData = {
             customerId,
+            uid: customerId, // Add uid for easier querying in Dashboard
             customerLocation,
-            itemDetails,
+            itemDetails: {
+                ...itemDetails,
+                // Ensure analysis data is preserved
+                analysis: itemDetails.analysis || {}
+            },
             vendorIds: vendors.map(v => v.id),
             status: 'pending', // pending acceptance
             createdAt: serverTimestamp(),

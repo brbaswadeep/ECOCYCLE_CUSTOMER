@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, ArrowLeft, Clock, MapPin, Truck, PlayCircle, Hourglass, CheckSquare, Calendar, Star, FileText, CheckCircle, ClipboardCheck, Factory, RefreshCw, Sparkles, PackageCheck } from 'lucide-react';
+import { Loader2, ArrowLeft, Clock, MapPin, Truck, PlayCircle, Hourglass, CheckSquare, Calendar, Star, FileText, CheckCircle, ClipboardCheck, Factory, RefreshCw, Sparkles, PackageCheck, Leaf } from 'lucide-react';
 import ChatModal from '../components/ChatModal';
 
 const TRACKING_STAGES = [
@@ -211,6 +211,90 @@ export default function OrderDetails() {
                         </div>
                     </div>
                 </div>
+
+                {/* Environmental Impact - Show when completed */}
+                {isCompleted && order.itemDetails?.analysis?.environmental_impact && (
+                    <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-3xl p-8 shadow-xl border-2 border-green-200 relative overflow-hidden">
+                        {/* Background Decoration */}
+                        <div className="absolute top-0 right-0 p-8 opacity-5">
+                            <Leaf className="w-64 h-64" />
+                        </div>
+
+                        <div className="relative z-10">
+                            {/* Header */}
+                            <div className="text-center mb-8">
+                                <div className="inline-flex items-center justify-center w-20 h-20 bg-green-500 rounded-full mb-4 shadow-lg">
+                                    <Leaf className="w-10 h-10 text-white" />
+                                </div>
+                                <h2 className="text-3xl font-extrabold text-green-900 mb-2">
+                                    🌍 Your Environmental Impact!
+                                </h2>
+                                <p className="text-green-700 font-medium text-lg">
+                                    You've made a positive difference for our planet
+                                </p>
+                            </div>
+
+                            {/* Impact Metrics Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                                {/* CO2 Saved */}
+                                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 text-center shadow-md border border-green-100 hover:scale-105 transition-transform">
+                                    <div className="text-4xl mb-2">🌱</div>
+                                    <div className="text-3xl font-black text-green-600 mb-1">
+                                        {order.itemDetails.analysis.environmental_impact.co2_saved_kg || 
+                                         order.itemDetails.analysis.environmental_impact.CO2_saved_kg || 0}
+                                    </div>
+                                    <div className="text-xs font-bold text-green-700 uppercase tracking-wider">
+                                        kg CO₂ Saved
+                                    </div>
+                                </div>
+
+                                {/* Landfill Diverted */}
+                                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 text-center shadow-md border border-green-100 hover:scale-105 transition-transform">
+                                    <div className="text-4xl mb-2">♻️</div>
+                                    <div className="text-3xl font-black text-green-600 mb-1">
+                                        {order.itemDetails.analysis.environmental_impact.landfill_diverted_kg || 0}
+                                    </div>
+                                    <div className="text-xs font-bold text-green-700 uppercase tracking-wider">
+                                        kg Waste Diverted
+                                    </div>
+                                </div>
+
+                                {/* Energy Saved */}
+                                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 text-center shadow-md border border-green-100 hover:scale-105 transition-transform">
+                                    <div className="text-4xl mb-2">⚡</div>
+                                    <div className="text-3xl font-black text-green-600 mb-1">
+                                        {order.itemDetails.analysis.environmental_impact.energy_saved_kwh || 0}
+                                    </div>
+                                    <div className="text-xs font-bold text-green-700 uppercase tracking-wider">
+                                        kWh Energy Saved
+                                    </div>
+                                </div>
+
+                                {/* Sustainability Score */}
+                                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 text-center shadow-md border border-green-100 hover:scale-105 transition-transform">
+                                    <div className="text-4xl mb-2">🏆</div>
+                                    <div className="text-3xl font-black text-green-600 mb-1">
+                                        {order.itemDetails.analysis.environmental_impact.sustainability_score || 0}
+                                    </div>
+                                    <div className="text-xs font-bold text-green-700 uppercase tracking-wider">
+                                        Sustainability Score
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Celebration Message */}
+                            <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-2xl p-6 text-center shadow-lg">
+                                <p className="text-xl font-bold mb-2">
+                                    ✨ Amazing Work! ✨
+                                </p>
+                                <p className="text-green-50 font-medium">
+                                    By choosing to upcycle instead of discarding, you've contributed to a cleaner, 
+                                    greener future. Every small action counts towards a sustainable tomorrow!
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Vendor & Payment Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

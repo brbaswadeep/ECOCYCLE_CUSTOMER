@@ -32,7 +32,8 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
                         material: result.waste_analysis?.detected_items?.[0]?.material_type,
                         image: image,
                         goal: selectedProduct ? `Recycle as: ${selectedProduct.product_name}` : 'General Recycling',
-                        conversionDetails: selectedProduct // Pass full object
+                        conversionDetails: selectedProduct, // Pass full object
+                        analysis: result // CRITICAL: Pass full analysis including environmental_impact
                     }}
                     onClose={() => {
                         setShowRequestModal(false);
