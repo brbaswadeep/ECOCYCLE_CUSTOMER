@@ -42,81 +42,144 @@ function LocationPickerContent({
     useEffect(() => {
         if (!mapRef.current) return;
 
-        // Check if google maps is loaded
-        if (!window.google || !window.google.maps) {
-            console.warn("Google Maps API not loaded");
-            return;
-        }
+        const initMap = async () => {
+            // Check if google maps is loaded
+            if (!window.google || !window.google.maps) {
+                console.warn("Google Maps API not loaded");
+                return;
+            }
 
-        const defaultLocation = { lat: 20.5937, lng: 78.9629 }; // India center
-        const startLocation = initialLocation || defaultLocation;
+            try {
+                const { Map } = await window.google.maps.importLibrary("maps");
+                const { AdvancedMarkerElement } = await window.google.maps.importLibrary("marker");
+                const { Geocoder } = await window.google.maps.importLibrary("geocoding");
 
-        const initializedMap = new window.google.maps.Map(mapRef.current, {
-            center: startLocation,
-            zoom: initialLocation ? 17 : 5,
-            mapId: "DEMO_MAP_ID", // Required for AdvancedMarkerElement
-            disableDefaultUI: true,
-            zoomControl: true,
-        });
+                const geocoder = new Geocoder();
 
-        setMap(initializedMap);
+                const defaultLocation = { lat: 20.5937, lng: 78.9629 }; // India center
+                const startLocation = initialLocation || defaultLocation;
 
-        // Initialize marker
-        const { AdvancedMarkerElement } = window.google.maps.marker;
-        const marker = new AdvancedMarkerElement({
-            map: initializedMap,
-            position: startLocation,
-            gmpDraggable: !readOnly,
-            title: "Selected Location"
-        });
-        markerRef.current = marker;
+                const initializedMap = new Map(mapRef.current, {
+                    center: startLocation,
+                    zoom: initialLocation ? 17 : 5,
+                    mapId: "DEMO_MAP_ID", // Required for AdvancedMarkerElement
+                    disableDefaultUI: true,
+                    zoomControl: true,
+                });
 
-        // Handle marker drag
-        if (!readOnly) {
-            marker.addListener('dragend', async () => {
-                const position = marker.position;
-                if (position) {
-                    const lat = position.lat;
-                    const lng = position.lng;
-                    // Simplify: just passing lat/lng. Geocoding would happen here ideally.
-                    if (onLocationSelect) {
-                        onLocationSelect({ lat, lng });
+                setMap(initializedMap);
+
+                // Initialize marker
+                const marker = new AdvancedMarkerElement({
+                    map: initializedMap,
+                    position: startLocation,
+                    gmpDraggable: !readOnly,
+                    title: "Selected Location"
+                });
+                markerRef.current = marker;
+
+                // Function to handle location update
+                const handleLocationUpdate = async (latLng) => {
+                    if (!latLng) return;
+
+                    const lat = typeof latLng.lat === 'function' ? latLng.lat() : latLng.lat;
+                    const lng = typeof latLng.lng === 'function' ? latLng.lng() : latLng.lng;
+
+                    // Geocode to get address - ensuring robust save
+                    try {
+                        const response = await geocoder.geocode({ location: { lat, lng } });
+                        if (response.results[0]) {
+                            const address = response.results[0].formatted_address;
+                            if (onLocationSelect) {
+                                onLocationSelect({
+                                    address,
+                                    coordinates: { lat, lng },
+                                    // Compatibility fields
+                                    lat,
+                                    lng
+                                });
+                            }
+                        } else {
+                            // Fallback
+                            if (onLocationSelect) {
+                                onLocationSelect({
+                                    address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+                                    coordinates: { lat, lng },
+                                    lat,
+                                    lng
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Geocoding failed:", e);
+                        // Fallback on error
+                        if (onLocationSelect) {
+                            onLocationSelect({
+                                address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+                                coordinates: { lat, lng },
+                                lat,
+                                lng
+                            });
+                        }
                     }
-                }
-            });
+                };
 
-            initializedMap.addListener('click', (e) => {
-                if (e.latLng) {
-                    marker.position = e.latLng;
-                    const lat = e.latLng.lat();
-                    const lng = e.latLng.lng();
-                    if (onLocationSelect) {
-                        onLocationSelect({ lat, lng });
-                    }
-                }
-            });
-        }
+                // Handle marker drag - Use addEventListener for AdvancedMarkerElement
+                if (!readOnly) {
+                    marker.addEventListener('dragend', async () => {
+                        await handleLocationUpdate(marker.position);
+                    });
 
-        // Setup Place Picker
-        if (pickerRef.current) {
-            pickerRef.current.addEventListener('gmpx-placechange', () => {
-                const place = pickerRef.current.place;
-                if (place && place.location) {
-                    const location = place.location;
-                    initializedMap.setCenter(location);
-                    initializedMap.setZoom(17);
-                    marker.position = location;
-
-                    if (onLocationSelect) {
-                        onLocationSelect({
-                            lat: location.lat(),
-                            lng: location.lng(),
-                            address: place.formattedAddress,
-                            name: place.displayName
-                        });
-                    }
+                    // Map still uses addListener (it is a google.maps.Map)
+                    initializedMap.addListener('click', async (e) => {
+                        if (e.latLng) {
+                            marker.position = e.latLng;
+                            await handleLocationUpdate(e.latLng);
+                        }
+                    });
                 }
-            });
+
+                // Setup Place Picker
+                if (pickerRef.current) {
+                    pickerRef.current.addEventListener('gmpx-placechange', () => {
+                        const place = pickerRef.current.place;
+                        if (place && place.location) {
+                            const location = place.location;
+                            initializedMap.setCenter(location);
+                            initializedMap.setZoom(17);
+                            marker.position = location;
+
+                            if (onLocationSelect) {
+                                onLocationSelect({
+                                    lat: location.lat(),
+                                    lng: location.lng(),
+                                    address: place.formattedAddress,
+                                    name: place.displayName,
+                                    coordinates: {
+                                        lat: location.lat(),
+                                        lng: location.lng()
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+
+            } catch (error) {
+                console.error("Error loading Google Maps libraries:", error);
+            }
+        };
+
+        if (window.google && window.google.maps) {
+            initMap();
+        } else {
+            const interval = setInterval(() => {
+                if (window.google && window.google.maps) {
+                    clearInterval(interval);
+                    initMap();
+                }
+            }, 100);
+            return () => clearInterval(interval);
         }
 
         return () => {
@@ -124,13 +187,19 @@ function LocationPickerContent({
         };
     }, []); // Run once on mount
 
-    // Update marker if initialLocation changes (e.g. from prop update)
+    // Update marker if initialLocation changes
     useEffect(() => {
         if (map && initialLocation && markerRef.current) {
-            const newPos = { lat: initialLocation.lat, lng: initialLocation.lng };
-            markerRef.current.position = newPos;
-            map.setCenter(newPos);
-            map.setZoom(17);
+            // Handle both structure formats
+            const lat = initialLocation.lat || initialLocation.coordinates?.lat;
+            const lng = initialLocation.lng || initialLocation.coordinates?.lng;
+
+            if (lat && lng) {
+                const newPos = { lat, lng };
+                markerRef.current.position = newPos;
+                map.setCenter(newPos);
+                map.setZoom(17);
+            }
         }
     }, [initialLocation, map]);
 
