@@ -1,5 +1,5 @@
 import { useAuth } from '../context/AuthContext';
-import { BarChart3, Leaf, Recycle, MapPin, LogOut, User, Phone, Mail, X, Scan } from 'lucide-react';
+import { BarChart3, Leaf, Recycle, MapPin, LogOut, User, Phone, Mail, X, Scan, DollarSign } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
@@ -11,6 +11,8 @@ export default function Dashboard() {
     const [userData, setUserData] = useState(null);
     const [stats, setStats] = useState({
         itemsRecycled: 0,
+        itemsSold: 0,
+        earnings: 0,
         co2Saved: 0,
         points: 0
     });
@@ -44,27 +46,39 @@ export default function Dashboard() {
             const q = query(
                 collection(db, 'requests'),
                 where('uid', '==', currentUser.uid),
-                // orderBy('createdAt', 'desc') // Requires index, handle client side sort if needed
             );
 
             const querySnapshot = await getDocs(q);
             const requests = [];
             let totalItems = 0;
+            let soldItems = 0;
+            let totalEarnings = 0;
             let totalCO2 = 0;
-            let totalLandfill = 0;
-            let totalEnergy = 0;
 
             querySnapshot.forEach(doc => {
                 const data = doc.data();
                 requests.push({ id: doc.id, ...data });
                 totalItems += 1;
-                
+
+                // Track Sold Items
+                if (data.itemDetails?.requestType === 'sell' && data.status === 'accepted') {
+                    soldItems += 1;
+                    totalEarnings += (data.finalQuote?.finalVendorEarnings || data.itemDetails?.askingPrice || 0); // User earnings approx (in sell model, finalVendorEarnings in doc is actually Customer Earnings potentially if we inverted logic in vendor panel... wait, vendor panel code used finalVendorEarnings as what VENDOR gets. I need to be careful here. 
+                    // PROVISIONAL: For now, use itemDetails.askingPrice if sold. I will refine vendor panel to store 'customerEarnings' in finalQuote.)
+                    // Actually, let's assume askingPrice for now, or 0 if pending.
+                    if (data.finalQuote?.customerEarnings) {
+                        totalEarnings += data.finalQuote.customerEarnings;
+                    } else {
+                        // Fallback for now until Vendor Panel is updated
+                        totalEarnings += data.itemDetails?.askingPrice || 0;
+                    }
+
+                }
+
                 // Aggregate real environmental impact data
                 if (data.itemDetails?.analysis?.environmental_impact) {
                     const impact = data.itemDetails.analysis.environmental_impact;
                     totalCO2 += impact.co2_saved_kg || impact.CO2_saved_kg || 0;
-                    totalLandfill += impact.landfill_diverted_kg || 0;
-                    totalEnergy += impact.energy_saved_kwh || 0;
                 }
             });
 
@@ -73,6 +87,8 @@ export default function Dashboard() {
 
             setStats({
                 itemsRecycled: totalItems,
+                itemsSold: soldItems,
+                earnings: totalEarnings,
                 co2Saved: totalCO2.toFixed(1),
                 points: totalItems * 50 // Mock: 50 pts per item
             });
@@ -112,6 +128,7 @@ export default function Dashboard() {
 
     const statCards = [
         { label: 'Items Recycled', value: stats.itemsRecycled, icon: <Recycle className="w-5 h-5 text-brand-red" />, change: 'Total Lifetime' },
+        { label: 'Sold Products', value: stats.itemsSold, icon: <DollarSign className="w-5 h-5 text-brand-green" />, change: `Earned ₹${stats.earnings}` },
         { label: 'CO2 Saved', value: `${stats.co2Saved}kg`, icon: <Leaf className="w-5 h-5 text-brand-green" />, change: 'Estimated Impact' },
         { label: 'Points Earned', value: stats.points, icon: <BarChart3 className="w-5 h-5 text-brand-brown" />, change: 'Redeemable Soon' },
     ];

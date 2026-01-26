@@ -16,6 +16,47 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
         </div>
     );
 
+    // --- PRICING ENGINE (Client-Side Fallback) ---
+    // User Rate Card (Lowest Prices)
+    const RATE_CARD = {
+        'iron': 25, 'steel': 35, 'stainless': 85, 'copper': 400, 'brass': 300,
+        'aluminium': 115, 'aluminum': 115, 'lead': 150, 'zinc': 100, 'tin': 20,
+        'plastic': 8, 'paper': 4, 'cardboard': 4, 'electronic': 50, 'ewaste': 50, 'e-waste': 50,
+        'battery': 80, 'rubber': 10, 'wire': 150, 'cable': 100, 'bottle': 8, 'can': 100
+    };
+
+    const getMaterialRate = (mat = "", obj = "") => {
+        const text = (mat + " " + obj).toLowerCase();
+        // Check for matches in Rate Card
+        for (const [key, price] of Object.entries(RATE_CARD)) {
+            if (text.includes(key)) return price;
+        }
+        return 0;
+    };
+
+    // 1. Get AI Value
+    const aiValue = parseFloat(result.quantity_estimation?.approximate_market_value || 0);
+
+    // 2. Calculate Fallback if AI value is missing/zero
+    const weight = parseFloat(result.quantity_estimation?.approximate_weight_kg || 1); // Default to 1kg if missing logic fails
+    const materialType = (result.waste_analysis?.detected_items?.[0]?.material_type || "").toLowerCase();
+    const specificObject = (result.waste_analysis?.detected_items?.[0]?.specific_object || "").toLowerCase();
+
+    let finalEstimatedValue = aiValue;
+    if (!finalEstimatedValue || finalEstimatedValue === 0) {
+        const rate = getMaterialRate(materialType, specificObject);
+        if (rate > 0) {
+            finalEstimatedValue = Math.round(weight * rate);
+        }
+    }
+
+    // Determine Sellability
+    const SELLABLE_KEYWORDS = ['metal', 'plastic', 'paper', 'cardboard', 'e-waste', 'electronic', 'battery', 'rubber', 'glass', 'copper', 'iron', 'steel', 'aluminium', 'brass', 'scrap', 'wire', 'cable', 'can', 'bottle'];
+    const isSellableMaterial = SELLABLE_KEYWORDS.some(k => materialType.includes(k) || specificObject.includes(k));
+
+    const canSell = finalEstimatedValue > 0 || isSellableMaterial;
+    const estimatedValue = finalEstimatedValue; // Use the final calculated value everywhere
+
     const handleVendorRequest = (product = null) => {
         setSelectedProduct(product);
         setShowRequestModal(true);
@@ -31,9 +72,11 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
                         name: selectedProduct?.product_name || result.waste_analysis?.detected_items?.[0]?.specific_object || "Item",
                         material: result.waste_analysis?.detected_items?.[0]?.material_type,
                         image: image,
-                        goal: selectedProduct ? `Recycle as: ${selectedProduct.product_name}` : 'General Recycling',
+                        goal: selectedProduct ? `Recycle as: ${selectedProduct.product_name}` : (canSell ? 'Sell to Vendor' : 'General Recycling'),
                         conversionDetails: selectedProduct, // Pass full object
-                        analysis: result // CRITICAL: Pass full analysis including environmental_impact
+                        analysis: result, // CRITICAL: Pass full analysis including environmental_impact
+                        requestType: (canSell || !selectedProduct) ? 'sell' : 'recycle',
+                        estimatedValue: estimatedValue
                     }}
                     onClose={() => {
                         setShowRequestModal(false);
@@ -84,7 +127,7 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
                         <span className="text-sm font-bold uppercase tracking-wider">Est. Value</span>
                     </div>
                     <div className="text-3xl font-extrabold text-brand-brown">
-                        ₹{result.quantity_estimation?.approximate_market_value || "0"}
+                        ₹{estimatedValue || "0"}
                     </div>
                     <div className="text-xs text-brand-brown/60 mt-1">Market estimate</div>
                 </div>
@@ -125,12 +168,24 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
                         </div>
 
                         {/* Action Button for Vendor Request */}
+                        {/* Action Button for Selling - ONLY if value exists */}
+                        {/* Action Button for Selling - APPEARS for all sellable materials */}
+                        {/* Action Button for Selling/Recycling - ALWAYS VISIBLE */}
                         <button
                             onClick={() => handleVendorRequest(null)}
-                            className="w-full py-3 mb-4 bg-brand-brown text-white font-bold rounded-xl hover:bg-brand-black transition-colors shadow-lg flex items-center justify-center gap-2"
+                            className={`w-full py-4 mb-4 text-white font-bold rounded-xl hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 animate-pulse-subtle ${canSell ? 'bg-brand-green hover:bg-brand-green-dark' : 'bg-brand-brown hover:bg-brand-black'}`}
                         >
-                            <Store className="w-5 h-5" />
-                            Sell / Request Pickup
+                            <div className="bg-white/20 p-2 rounded-full">
+                                <Store className="w-5 h-5" />
+                            </div>
+                            <div className="flex flex-col items-start leading-tight">
+                                <span className="text-xs uppercase tracking-wider opacity-90">
+                                    {canSell ? 'Sell Directly' : 'Vendor Options'}
+                                </span>
+                                <span className="text-lg">
+                                    {estimatedValue > 0 ? `Get ₹${estimatedValue} Cash` : (canSell ? 'Get Best Quote' : 'Sell / Request Pickup')}
+                                </span>
+                            </div>
                         </button>                        <div className="grid grid-cols-3 gap-2 text-center text-xs">
                             <div className="bg-white p-2 rounded-lg border border-brand-brown/10">
                                 <div className="font-bold text-brand-brown">Feasibility</div>

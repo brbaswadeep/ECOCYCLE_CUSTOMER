@@ -158,40 +158,50 @@ Structure final JSON exactly as follows:
     "energy_saved_kwh": number
   },
   "overall_confidence": 0.0 – 1.0,
-        You are an expert Recycling & Upcycling AI with a sophisticated Pricing Engine.
-        Analyze the waste item in the image and suggest **3 practical, everyday useful** upcycling ideas.
-
-        **CRITICAL PRICING & ANALYSIS LOGIC**:
-        You must apply the following logic to generate data:
-
-        1. **Material Analysis**:
-           - Identify Material Group (Plastic, Textile, Wood, Metal, Glass).
-           - Yield Factor ($Y$): Plastic(0.85), Textile(0.70), Wood(0.65), Metal(0.95), Glass(0.80).
-           - Quality Grade ($Q$): Grade A (0.0 loss), Grade B (0.2 loss), Grade C (0.5 loss).
-           - Usable Weight ($W_{final}$) = Input Weight * Yield Factor * (1 - Quality Loss).
-
-        2. **Conversion Difficulty**:
-           - Tier 1 (Easy): Cutting, Shredding. Multiplier ~1.0-1.2.
-           - Tier 2 (Medium): Assembly, Sewing, Joinery. Multiplier ~1.5.
-           - Tier 3 (Hard): Welding, Molding. Multiplier ~2.5.
-
-        3. **Pricing Engine Formula (Estimation)**:
-           - "base_manufacturing_cost": (Number) Calculated as: (Usable Weight * Material Rate) * Complexity Multiplier. This is the VENDOR'S PAYOUT.
-        - "platform_fees_and_taxes": (Number) Calculated as 2% of Base Manufacturing Cost. (ECOCYCLE COMMISSION).
-        - "customer_display_mfg_price": (Number) Base Manufacturing Cost + Platform Fees.
-        - "logistics_cost": (Number) Flat rate Rs. 150 (if applicable).
-           
+        You are an expert Recycling & Upcycling AI with a sophisticated Pricing Engine AND Scrap Valuation System.
+        
+        Analyze the waste item in the image.
+        
+        **TASK 1: SCRAP VALUATION (SELLING MODE)**
+        If the item falls into "Metal & Scrap" or "Other Recyclable Waste", you MUST estimate its **Sell Value** using the rate card below.
+        
+        **RATE CARD (Use LOWEST price in range for estimation):**
+        
+        *🧱 Metal & Scrap Materials:*
+        - Iron Scrap: ₹25/kg
+        - Steel Scrap: ₹35/kg
+        - Stainless Steel: ₹85/kg
+        - Copper Scrap: ₹400/kg
+        - Brass Scrap: ₹300/kg
+        - Aluminium Scrap: ₹115/kg
+        - Lead Scrap: ₹150/kg
+        - Zinc Scrap: ₹100/kg
+        - Tin Scrap: ₹20/kg
+        
+        *🗑️ Other Recyclable Waste:*
+        - Plastic Scrap: ₹8/kg
+        - Paper/Cardboard: ₹4/kg
+        - Electronic Scrap / E-Waste: ₹50/kg
+        - Battery Scrap (Lead-acid): ₹80/kg
+        - Rubber Scrap: ₹10/kg
+        
+        **TASK 2: UPCYCLING IDEAS (REUSE MODE)**
+        Suggest **3 practical, everyday useful** upcycling ideas if the user chooses to repurpose instead of sell.
+        
         **OUTPUT JSON FORMAT**:
         {
             "waste_analysis": {
                 "detected_items": [
                     {
-                        "specific_object": "e.g., Denim Jeans",
-                        "material_type": "Textile",
-                        "condition": "Stained/Clean",
-                        "quantity_found": 1
+                        "specific_object": "e.g., Old Iron Pipe",
+                        "material_type": "Iron Scrap", 
+                        "confidence_score": 0.95
                     }
                 ]
+            },
+            "quantity_estimation": {
+                "approximate_weight_kg": 2.5,
+                "approximate_market_value": 62.5 // (2.5kg * ₹25)
             },
             "environmental_impact": {
                 "sustainability_score": 85,
@@ -199,37 +209,18 @@ Structure final JSON exactly as follows:
             },
             "conversion_options": [
                 {
-                    "product_name": "Must be practical! (e.g., 'Denim Groceryote')",
-                    "conversion_type": "DIY" | "Vendor Assisted" | "Hybrid",
+                    "product_name": "Must be practical! (e.g., 'Industrial Curtain Rod')",
+                    "conversion_type": "DIY",
                     "description": "Short description.",
-                    "daily_use_case": "Explain usage (e.g., 'Replaces plastic bags for daily grocery runs').",
-                    "required_processing": "e.g., 'Washing, Cutting patterns, Stitching'.",
-                    "difficulty_level": "Easy" | "Medium" | "Hard",
-                    
-                    "materials_needed": {
-                         "customer_can_provide": ["List items user likely has (e.g. Scissors, Old thread)"],
-                         "vendor_can_provide": ["List professional supplies (e.g. Heavy Duty Zipper, Lining fabric)"]
-                    },
-
-                    "analysis_factors": {
-                        "material_category": "Textile",
-                        "yield_factor": 0.70,
-                        "quality_grade": "B",
-                        "complexity_tier": 2,
-                        "input_weight_kg": 1.5,
-                        "usable_weight_kg": 0.84
-                    },
-
-                    "cost_breakdown": {
-                        "base_manufacturing_cost": 150,
-                        "commission_and_taxes": 30,
-                        "customer_display_mfg_price": 180,
-                        "logistics_cost": 50
-                    },
-
+                    "daily_use_case": "Explain usage.",
+                    "required_processing": "e.g., 'Cleaning, Painting'.",
+                    "difficulty_level": "Easy",
                     "estimated_market_value_inr": 450,
-                    "expected_profit_or_loss_inr": 240,
-                    "feasibility_score": 0.85
+                    "cost_breakdown": { // Only relevance for SERVICE/DIY requests, NOT Sell requests
+                         "base_manufacturing_cost": 100,
+                         "logistics_cost": 50,
+                         "customer_display_mfg_price": 150
+                    }
                 }
             ]
         }
@@ -237,7 +228,7 @@ Structure final JSON exactly as follows:
         **IMPORTANT**: 
         - DO NOT return markdown. Return ONLY pure JSON.
         - Be realistic with INR costs.
-        - "product_name" MUST be a useful object, not just "art".
+        - "approximate_market_value" MUST be filled if the item matches the rate card. If not (e.g. food waste), set to 0.
     `;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

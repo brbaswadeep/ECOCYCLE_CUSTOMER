@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { findLocalVendors, createVendorRequest } from '../services/requestService';
-import { Loader2, MapPin, CheckCircle, AlertCircle, Store } from 'lucide-react';
+import { Loader2, MapPin, CheckCircle, AlertCircle, Store, DollarSign } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function RequestConfirmation({ item, onClose, onSuccess }) {
@@ -9,6 +9,7 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
     const [vendors, setVendors] = useState([]);
     const [requestStatus, setRequestStatus] = useState('searching'); // searching, found, none, submitting, success, error
     const [errorMsg, setErrorMsg] = useState('');
+    const [askingPrice, setAskingPrice] = useState(item.estimatedValue || 0);
 
     useEffect(() => {
         if (currentUser && currentUser.location && currentUser.location.coordinates) {
@@ -46,7 +47,11 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
             await createVendorRequest(
                 currentUser.uid,
                 currentUser.location,
-                item, // Pass item details
+                {
+                    ...item,
+                    askingPrice: parseFloat(askingPrice),
+                    requestType: item.requestType || 'recycle'
+                }, // Pass item details
                 vendors
             );
             setRequestStatus('success');
@@ -63,9 +68,9 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* Header */}
-                <div className="bg-brand-brown p-6 text-white text-center">
-                    <h2 className="text-xl font-bold">Sell / Push to Vendors</h2>
-                    <p className="opacity-80 text-sm mt-1">Connecting with local recyclers</p>
+                <div className={`${item.requestType === 'sell' ? 'bg-brand-green' : 'bg-brand-brown'} p-6 text-white text-center transition-colors`}>
+                    <h2 className="text-xl font-bold">{item.requestType === 'sell' ? 'Sell to Local Vendors' : 'Request Pickup / Recycle'}</h2>
+                    <p className="opacity-80 text-sm mt-1">{item.requestType === 'sell' ? 'Get paid for your recyclables' : 'Connecting with local recyclers'}</p>
                 </div>
 
                 <div className="p-6 overflow-y-auto flex-1">
@@ -80,6 +85,11 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
                             <div className="text-xs text-brand-brown/60">
                                 {item.material || 'Unknown Material'}
                             </div>
+                            {item.requestType === 'sell' && (
+                                <div className="text-xs font-bold text-brand-green mt-1">
+                                    Est. Value: ₹{item.estimatedValue}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -105,8 +115,45 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
                                 <p className="text-brand-brown/70 mb-6">
                                     We found local vendors near you who accept this material.
                                 </p>
+
+                                {item.requestType === 'sell' && (
+                                    <div className="bg-brand-green/10 p-4 rounded-xl mb-6">
+                                        <label className="block text-sm font-bold text-brand-green mb-2 uppercase tracking-wide">
+                                            Your Selling Price (₹)
+                                        </label>
+                                        <div className="relative max-w-[200px] mx-auto">
+                                            <div className="flex items-center justify-center gap-2 mb-2">
+                                                <button
+                                                    onClick={() => setAskingPrice(Math.max(0, parseFloat(askingPrice) - 1))}
+                                                    className="w-8 h-8 rounded-full bg-gray-100 font-bold text-gray-600 hover:bg-gray-200"
+                                                >-</button>
+                                                <input
+                                                    type="number"
+                                                    value={askingPrice}
+                                                    onChange={(e) => {
+                                                        const val = parseFloat(e.target.value);
+                                                        const limit = (item.estimatedValue || 0) + 15;
+                                                        if (val <= limit) setAskingPrice(val);
+                                                    }}
+                                                    className="w-24 text-center text-2xl font-black text-brand-brown bg-white border border-brand-green/30 rounded-lg p-2 focus:ring-2 focus:ring-brand-green focus:outline-none"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const limit = (item.estimatedValue || 0) + 15;
+                                                        setAskingPrice(Math.min(limit, parseFloat(askingPrice) + 1));
+                                                    }}
+                                                    className="w-8 h-8 rounded-full bg-gray-100 font-bold text-gray-600 hover:bg-gray-200"
+                                                >+</button>
+                                            </div>
+                                            <div className="text-xs text-brand-green/70 mt-1 font-medium">
+                                                Max allowed: ₹{(item.estimatedValue || 0) + 15}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="bg-green-50 p-3 rounded-lg text-sm text-green-800 font-medium mb-6">
-                                    Click Confirm to send pickup requests to all of them.
+                                    Click Confirm to send {item.requestType === 'sell' ? 'offer' : 'pickup request'} to {vendors.length} vendors.
                                 </div>
                             </div>
                         )}
@@ -130,7 +177,7 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
                                 </div>
                                 <h3 className="text-xl font-bold text-brand-brown mb-2">Request Sent!</h3>
                                 <p className="text-brand-brown/70">
-                                    We've notified {vendors.length} vendors. You'll be notified when they accept.
+                                    We've notified {vendors.length} vendors. You'll be notified when they {item.requestType === 'sell' ? 'buy' : 'accept'}.
                                 </p>
                             </div>
                         )}
@@ -157,9 +204,9 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
                     {requestStatus === 'found' && (
                         <button
                             onClick={handleConfirmRequest}
-                            className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-brand-brown hover:bg-brand-black transition-colors shadow-lg"
+                            className={`flex-1 py-3 px-4 rounded-xl font-bold text-white transition-colors shadow-lg ${item.requestType === 'sell' ? 'bg-brand-green hover:bg-brand-green-dark' : 'bg-brand-brown hover:bg-brand-black'}`}
                         >
-                            Confirm Request
+                            Confirm {item.requestType === 'sell' ? 'Sale' : 'Request'}
                         </button>
                     )}
                 </div>
