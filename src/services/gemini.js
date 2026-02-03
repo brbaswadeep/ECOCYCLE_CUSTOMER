@@ -75,6 +75,10 @@ Use conservative estimates if unsure.
 STEP 4: CONVERSION OPTIONS (HOUSEHOLD FOCUS)
 ------------------------------------
 For each waste type, suggest creative UPICYCLING/REUSE ideas for a regular Indian home.
+*** ABSOLUTE RULE: VALUE ₹100 - ₹400 ***
+- You MUST NOT suggest any idea worth less than ₹100 or more than ₹400.
+- If a single item is too cheap (e.g. ₹40), you MUST Suggest a "SET" or "BATCH" (e.g. "Set of 3 Planters" = ₹120).
+- Or assume "PREMIUM" finish/add-ons to justify higher cost.
 
 Each option must include:
 - product_name (e.g., "Self-Watering Planter", "Organizer Box", "Bird Feeder")
@@ -178,6 +182,16 @@ Structure final JSON exactly as follows:
         - Zinc Scrap: ₹100/kg
         - Tin Scrap: ₹20/kg
         
+        **RESOURCE INVENTORY (COMMON HOUSEHOLD ITEMS - ALWAYS AVAILABLE)**:
+        - Cardboard (Old boxes)
+        - Old Clothes/Fabric Scraps
+        - Newspapers / Magazines
+        - Glass Jars / Bottles
+        - Paints (Acrylic/Poster) & Brushes
+        - Glue (Fevicol), Tape, Scissors, Thread & Needle
+        - Wires, String, Jute Rope
+
+        
         *🗑️ Other Recyclable Waste:*
         - Plastic Scrap: ₹8/kg
         - Paper/Cardboard: ₹4/kg
@@ -186,8 +200,20 @@ Structure final JSON exactly as follows:
         - Rubber Scrap: ₹10/kg
         
         **TASK 2: UPCYCLING IDEAS (REUSE MODE)**
-        Suggest **3 practical, everyday useful** upcycling ideas if the user chooses to repurpose instead of sell.
+        Suggest **3 practical, everyday useful** upcycling ideas.
         
+        **CRITICAL INSTRUCTION - HOW TO REACH ₹100 VALUE**:
+        - You MUST combine the waste item with 2-3 items from the "RESOURCE INVENTORY" list to create a finished product.
+        - Example: Don't just say "Bottle Planter" (₹20). Say "Hand-Painted Vertical Hanging Planter" (Bottle + Jute Rope + Acrylic Paint) -> Value ₹150.
+        
+        **STRICT PRICING RULE**: 
+        - DO NOT return any idea with \`estimated_market_value_inr\` < 100 or > 400.
+        - Ideas must be "Product Level" quality, not just "Trash Hacking".
+        - **DETAILED & PERFECT ANALYSIS**:
+          - materials_needed: { customer_can_provide: [], vendor_can_provide: [] } -> Must be detailed.
+          - step_by_step_instructions: Must be clear, actionable, and lead to a professional result.
+          - estimated_market_value_inr: Calculate based on similar handmade/upcycled products sold on Etsy/Amazon India. Be precise.
+
         **OUTPUT JSON FORMAT**:
         {
             "waste_analysis": {
@@ -216,7 +242,16 @@ Structure final JSON exactly as follows:
                     "required_processing": "e.g., 'Cleaning, Painting'.",
                     "difficulty_level": "Easy",
                     "estimated_market_value_inr": 450,
-                    "cost_breakdown": { // Only relevance for SERVICE/DIY requests, NOT Sell requests
+                    "material_list": [
+                         "List ALL required materials here",
+                         "Include both waste item and extra supplies"
+                    ],
+                    "step_by_step_instructions": [
+                         "1. Clean the item...", 
+                         "2. Cut along the edge...",
+                         "3. Paint with acrylics..."
+                    ],
+                    "cost_breakdown": { 
                          "base_manufacturing_cost": 100,
                          "logistics_cost": 50,
                          "customer_display_mfg_price": 150
@@ -234,54 +269,54 @@ Structure final JSON exactly as follows:
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function analyzeWasteImage(base64Image) {
-    const maxRetries = 3;
-    let attempt = 0;
+  const maxRetries = 3;
+  let attempt = 0;
 
-    while (attempt < maxRetries) {
-        try {
-            // Remove header if present (e.g., "data:image/jpeg;base64,")
-            const imageParts = [
-                {
-                    inlineData: {
-                        data: base64Image.split(",")[1] || base64Image,
-                        mimeType: "image/jpeg",
-                    },
-                },
-            ];
+  while (attempt < maxRetries) {
+    try {
+      // Remove header if present (e.g., "data:image/jpeg;base64,")
+      const imageParts = [
+        {
+          inlineData: {
+            data: base64Image.split(",")[1] || base64Image,
+            mimeType: "image/jpeg",
+          },
+        },
+      ];
 
-            const result = await model.generateContent([SYSTEM_PROMPT, ...imageParts]);
-            const response = await result.response;
-            const text = response.text();
+      const result = await model.generateContent([SYSTEM_PROMPT, ...imageParts]);
+      const response = await result.response;
+      const text = response.text();
 
-            // Robust JSON extraction: Find the first '{' and the last '}'
-            const startIndex = text.indexOf('{');
-            const endIndex = text.lastIndexOf('}');
+      // Robust JSON extraction: Find the first '{' and the last '}'
+      const startIndex = text.indexOf('{');
+      const endIndex = text.lastIndexOf('}');
 
-            if (startIndex === -1 || endIndex === -1) {
-                throw new Error("Invalid response format from AI");
-            }
+      if (startIndex === -1 || endIndex === -1) {
+        throw new Error("Invalid response format from AI");
+      }
 
-            const jsonString = text.substring(startIndex, endIndex + 1);
-            return JSON.parse(jsonString);
+      const jsonString = text.substring(startIndex, endIndex + 1);
+      return JSON.parse(jsonString);
 
-        } catch (error) {
-            console.error(`Gemini Analysis Error (Attempt ${attempt + 1}/${maxRetries}):`, error);
+    } catch (error) {
+      console.error(`Gemini Analysis Error (Attempt ${attempt + 1}/${maxRetries}):`, error);
 
-            // Handle both 429 (Too Many Requests) and 503 (Service Unavailable/Overloaded)
-            if (error.message.includes("429") || error.status === 429 || error.message.includes("503") || error.status === 503) {
-                attempt++;
-                if (attempt < maxRetries) {
-                    const waitTime = 2000 * Math.pow(2, attempt); // Exponential backoff: 4s, 8s, 16s
-                    console.log(`Service overloaded or rate limit hit. Retrying in ${waitTime}ms...`);
-                    await delay(waitTime);
-                    continue;
-                }
-            }
-            // For other errors, or if retries exhausted, throw
-            if (attempt === maxRetries) {
-                throw new Error("Service is currently experiencing high traffic. We tried multiple times but failed. Please try again in a minute.");
-            }
-            throw new Error("Failed to analyze image. Please try again.");
+      // Handle both 429 (Too Many Requests) and 503 (Service Unavailable/Overloaded)
+      if (error.message.includes("429") || error.status === 429 || error.message.includes("503") || error.status === 503) {
+        attempt++;
+        if (attempt < maxRetries) {
+          const waitTime = 2000 * Math.pow(2, attempt); // Exponential backoff: 4s, 8s, 16s
+          console.log(`Service overloaded or rate limit hit. Retrying in ${waitTime}ms...`);
+          await delay(waitTime);
+          continue;
         }
+      }
+      // For other errors, or if retries exhausted, throw
+      if (attempt === maxRetries) {
+        throw new Error("Service is currently experiencing high traffic. We tried multiple times but failed. Please try again in a minute.");
+      }
+      throw new Error("Failed to analyze image. Please try again.");
     }
+  }
 }

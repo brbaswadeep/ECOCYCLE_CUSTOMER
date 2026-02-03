@@ -56,15 +56,15 @@ export const createVendorRequest = async (customerId, customerLocation, itemDeta
             customerLocation,
             itemDetails: {
                 ...itemDetails,
-                // Ensure analysis data is preserved
-                analysis: itemDetails.analysis || {}
+                analysis: itemDetails.analysis || {},
+                image: null // Prevent base64 from hitting Firestore limit
             },
             vendorIds: vendors.map(v => v.id),
             status: 'pending', // pending acceptance
             createdAt: serverTimestamp(),
             // We store basic details of the item for quick display
             itemName: itemDetails.name || 'Unknown Item',
-            itemImage: itemDetails.image || '',
+            itemImage: null, // Prevent base64 from hitting Firestore limit
         };
 
         const docRef = await addDoc(collection(db, "requests"), requestData);

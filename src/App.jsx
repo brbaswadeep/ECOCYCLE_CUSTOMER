@@ -11,6 +11,7 @@ import HistoryDetail from './pages/HistoryDetail';
 import OrderDetails from './pages/OrderDetails';
 import Profile from './pages/Profile';
 import Messages from './pages/Messages';
+import Shop from './pages/Shop';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -45,6 +46,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Messages />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shop"
+              element={
+                <ProtectedRoute>
+                  <Shop />
                 </ProtectedRoute>
               }
             />

@@ -138,8 +138,25 @@ export default function ProductCard({ option, index, onImageLoad, onAction }) {
                             </div>
                         )}
 
-                        {/* Materials Split */}
-                        {option.materials_needed && (
+                        {/* Materials List (New Detailed Format) */}
+                        {option.material_list && option.material_list.length > 0 && (
+                            <div className="bg-brand-cream/30 p-4 rounded-xl border border-brand-brown/10">
+                                <div className="text-xs font-bold text-brand-brown/60 uppercase mb-2 flex items-center gap-2">
+                                    <span>📦</span> Required Materials
+                                </div>
+                                <ul className="grid grid-cols-1 gap-1">
+                                    {option.material_list.map((item, i) => (
+                                        <li key={i} className="text-sm text-brand-brown/80 flex items-start gap-2">
+                                            <span className="text-brand-orange mt-1">•</span>
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Fallback Legacy Materials Split */}
+                        {!option.material_list && option.materials_needed && (
                             <div className="grid grid-cols-2 gap-3 text-xs">
                                 <div>
                                     <div className="font-bold text-brand-brown/60 uppercase mb-1">You Provide</div>
@@ -152,6 +169,25 @@ export default function ProductCard({ option, index, onImageLoad, onAction }) {
                                     <ul className="list-disc list-inside text-brand-orange opacity-80">
                                         {option.materials_needed.vendor_can_provide?.map((m, i) => <li key={i}>{m}</li>)}
                                     </ul>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step-by-Step Instructions */}
+                        {option.step_by_step_instructions && option.step_by_step_instructions.length > 0 && (
+                            <div className="bg-white p-4 rounded-xl border border-brand-brown/10 shadow-sm">
+                                <div className="text-xs font-bold text-brand-brown/60 uppercase mb-3 flex items-center gap-2">
+                                    <span>🛠️</span> How to Make it
+                                </div>
+                                <div className="space-y-3">
+                                    {option.step_by_step_instructions.map((step, i) => (
+                                        <div key={i} className="flex gap-3 text-sm text-brand-brown group">
+                                            <div className="w-6 h-6 rounded-full bg-brand-brown/10 text-brand-brown font-bold flex items-center justify-center flex-shrink-0 group-hover:bg-brand-brown group-hover:text-white transition-colors text-xs">
+                                                {i + 1}
+                                            </div>
+                                            <p className="pt-0.5 leading-relaxed">{step}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}

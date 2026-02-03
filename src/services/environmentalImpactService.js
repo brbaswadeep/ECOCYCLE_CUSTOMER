@@ -188,6 +188,7 @@ const generateImpactStatements = (
 /**
  * Batch calculate environmental impact for multiple waste items
  */
+
 export const calculateBatchEnvironmentalImpact = (wasteItems) => {
   if (!Array.isArray(wasteItems)) {
     return { error: 'Input must be an array of waste items' };

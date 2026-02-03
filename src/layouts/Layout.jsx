@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LogIn, User, LayoutDashboard, History, MapPin, Scan, Menu, X, LogOut, Leaf, MessageCircle } from 'lucide-react';
+import { LogIn, User, LayoutDashboard, History, MapPin, Scan, Menu, X, LogOut, Leaf, MessageCircle, ShoppingBag } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 import LocationRequiredPopup from '../components/LocationRequiredPopup';
@@ -32,6 +32,7 @@ export default function Layout() {
                 <div className="flex-1 overflow-y-auto py-8 px-5 flex flex-col gap-6">
                     <div className="space-y-4">
                         <NavLink to="/dashboard" icon={<LayoutDashboard size={24} />} label="Dashboard" active={location.pathname === '/dashboard'} />
+                        <NavLink to="/shop" icon={<ShoppingBag size={24} />} label="Shop" active={location.pathname === '/shop'} />
                         <NavLink to="/messages" icon={<MessageCircle size={24} />} label="Messages" active={location.pathname === '/messages'} />
                         <NavLink to="/history" icon={<History size={24} />} label="My Activity" active={location.pathname === '/history'} />
                     </div>
@@ -94,6 +95,7 @@ export default function Layout() {
                         <div className="absolute right-0 top-16 bottom-0 w-64 bg-white p-4 shadow-xl" onClick={e => e.stopPropagation()}>
                             <div className="space-y-2">
                                 <NavLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" active={location.pathname === '/dashboard'} />
+                                <NavLink to="/shop" icon={<ShoppingBag size={20} />} label="Shop" active={location.pathname === '/shop'} />
                                 <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} />
                                 <NavLink to="/history" icon={<History size={20} />} label="My Activity" active={location.pathname === '/history'} />
                                 <NavLink to="/smart-scan" icon={<Scan size={20} />} label="Smart Scan" active={location.pathname === '/smart-scan'} />
@@ -110,8 +112,6 @@ export default function Layout() {
                         <div className="flex-1 p-4 lg:p-8">
                             <Outlet />
                         </div>
-
-
                     </div>
                 </main>
             </div>
