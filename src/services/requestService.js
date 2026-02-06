@@ -57,14 +57,15 @@ export const createVendorRequest = async (customerId, customerLocation, itemDeta
             itemDetails: {
                 ...itemDetails,
                 analysis: itemDetails.analysis || {},
-                image: null // Prevent base64 from hitting Firestore limit
+                image: itemDetails.imageUrl || null // Use URL if available, otherwise null (don't save base64)
             },
             vendorIds: vendors.map(v => v.id),
             status: 'pending', // pending acceptance
             createdAt: serverTimestamp(),
             // We store basic details of the item for quick display
             itemName: itemDetails.name || 'Unknown Item',
-            itemImage: null, // Prevent base64 from hitting Firestore limit
+            itemImage: itemDetails.imageUrl || null, // Use URL if available
+            type: itemDetails.requestType === 'sell' ? 'buy_request' : 'pickup_request'
         };
 
         const docRef = await addDoc(collection(db, "requests"), requestData);

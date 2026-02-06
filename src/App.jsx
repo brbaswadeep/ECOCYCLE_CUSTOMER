@@ -15,7 +15,7 @@ import Shop from './pages/Shop';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
-  const GOOGLE_MAPS_API_KEY = "AIzaSyBjhn7f7atke2N588iXT_i67Bgx3bKQZN8";
+  const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   return (
     <BrowserRouter>

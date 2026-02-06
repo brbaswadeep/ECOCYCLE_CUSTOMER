@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = "AIzaSyBcUBQ9xK-uJoDwfdNGuYE7IuWCQtOw6EM"; // User provided key
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; // User provided key
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -172,32 +172,28 @@ Structure final JSON exactly as follows:
         **RATE CARD (Use LOWEST price in range for estimation):**
         
         *🧱 Metal & Scrap Materials:*
-        - Iron Scrap: ₹25/kg
+        - Iron Scrap: ₹26/kg
         - Steel Scrap: ₹35/kg
         - Stainless Steel: ₹85/kg
-        - Copper Scrap: ₹400/kg
-        - Brass Scrap: ₹300/kg
-        - Aluminium Scrap: ₹115/kg
+        - Copper Scrap: ₹425/kg
+        - Brass Scrap: ₹305/kg
+        - Aluminium Scrap: ₹105/kg
         - Lead Scrap: ₹150/kg
         - Zinc Scrap: ₹100/kg
         - Tin Scrap: ₹20/kg
-        
-        **RESOURCE INVENTORY (COMMON HOUSEHOLD ITEMS - ALWAYS AVAILABLE)**:
-        - Cardboard (Old boxes)
-        - Old Clothes/Fabric Scraps
-        - Newspapers / Magazines
-        - Glass Jars / Bottles
-        - Paints (Acrylic/Poster) & Brushes
-        - Glue (Fevicol), Tape, Scissors, Thread & Needle
-        - Wires, String, Jute Rope
+        - Motor: ₹35/kg
+        - Ceiling Fan: ₹35/kg
 
-        
         *🗑️ Other Recyclable Waste:*
-        - Plastic Scrap: ₹8/kg
-        - Paper/Cardboard: ₹4/kg
+        - Plastic Scrap: ₹10/kg
+        - Newspaper: ₹13/kg
+        - Books: ₹10/kg
+        - Papers (A4): ₹12/kg
+        - Cardboard: ₹5/kg
         - Electronic Scrap / E-Waste: ₹50/kg
-        - Battery Scrap (Lead-acid): ₹80/kg
+        - Battery Scrap (Lead-acid): ₹72/kg
         - Rubber Scrap: ₹10/kg
+        - Wood: ₹17/kg
         
         **TASK 2: UPCYCLING IDEAS (REUSE MODE)**
         Suggest **3 practical, everyday useful** upcycling ideas.

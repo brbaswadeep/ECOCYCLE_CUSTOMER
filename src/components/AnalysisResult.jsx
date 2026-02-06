@@ -3,7 +3,7 @@ import { Leaf, DollarSign, Recycle, Store } from 'lucide-react';
 import ProductCard from './ProductCard';
 import RequestConfirmation from './RequestConfirmation';
 
-export default function AnalysisResult({ result, image, onReset, onDone, isHistoryView = false }) {
+export default function AnalysisResult({ result, image, imageUrl, onReset, onDone, isHistoryView = false }) {
     const [showRequestModal, setShowRequestModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -19,10 +19,12 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
     // --- PRICING ENGINE (Client-Side Fallback) ---
     // User Rate Card (Lowest Prices)
     const RATE_CARD = {
-        'iron': 25, 'steel': 35, 'stainless': 85, 'copper': 400, 'brass': 300,
-        'aluminium': 115, 'aluminum': 115, 'lead': 150, 'zinc': 100, 'tin': 20,
-        'plastic': 8, 'paper': 4, 'cardboard': 4, 'electronic': 50, 'ewaste': 50, 'e-waste': 50,
-        'battery': 80, 'rubber': 10, 'wire': 150, 'cable': 100, 'bottle': 8, 'can': 100
+        'iron': 26, 'steel': 35, 'stainless': 85, 'copper': 425, 'brass': 305,
+        'aluminium': 105, 'aluminum': 105, 'lead': 150, 'zinc': 100, 'tin': 20,
+        'plastic': 10, 'newspaper': 13, 'book': 10, 'paper': 12, 'cardboard': 5,
+        'electronic': 50, 'ewaste': 50, 'e-waste': 50, 'battery': 72, 'rubber': 10,
+        'wire': 150, 'cable': 100, 'bottle': 8, 'can': 100,
+        'motor': 35, 'fan': 35, 'wood': 17
     };
 
     const getMaterialRate = (mat = "", obj = "") => {
@@ -51,7 +53,7 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
     }
 
     // Determine Sellability
-    const SELLABLE_KEYWORDS = ['metal', 'plastic', 'paper', 'cardboard', 'e-waste', 'electronic', 'battery', 'rubber', 'glass', 'copper', 'iron', 'steel', 'aluminium', 'brass', 'scrap', 'wire', 'cable', 'can', 'bottle'];
+    const SELLABLE_KEYWORDS = ['metal', 'plastic', 'paper', 'cardboard', 'e-waste', 'electronic', 'battery', 'rubber', 'glass', 'copper', 'iron', 'steel', 'aluminium', 'brass', 'scrap', 'wire', 'cable', 'can', 'bottle', 'wood', 'motor', 'fan', 'book', 'newspaper'];
     const isSellableMaterial = SELLABLE_KEYWORDS.some(k => materialType.includes(k) || specificObject.includes(k));
 
     const canSell = finalEstimatedValue > 0 || isSellableMaterial;
@@ -71,11 +73,12 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
                     item={{
                         name: selectedProduct?.product_name || result.waste_analysis?.detected_items?.[0]?.specific_object || "Item",
                         material: result.waste_analysis?.detected_items?.[0]?.material_type,
-                        image: image,
-                        goal: selectedProduct ? `Recycle as: ${selectedProduct.product_name}` : (canSell ? 'Sell to Vendor' : 'General Recycling'),
+                        image: image, // Display blob
+                        imageUrl: imageUrl, // Real URL for request
+                        goal: selectedProduct ? `Recycle as: ${selectedProduct.product_name}` : (canSell ? 'Sell Directly' : 'General Recycling'),
                         conversionDetails: selectedProduct, // Pass full object
                         analysis: result, // CRITICAL: Pass full analysis including environmental_impact
-                        requestType: (canSell || !selectedProduct) ? 'sell' : 'recycle',
+                        requestType: (canSell && !selectedProduct) ? 'sell' : 'recycle',
                         estimatedValue: estimatedValue
                     }}
                     onClose={() => {
@@ -173,7 +176,7 @@ export default function AnalysisResult({ result, image, onReset, onDone, isHisto
                         {/* Action Button for Selling/Recycling - ALWAYS VISIBLE */}
                         <button
                             onClick={() => handleVendorRequest(null)}
-                            className={`w-full py-4 mb-4 text-white font-bold rounded-xl hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 animate-pulse-subtle ${canSell ? 'bg-brand-green hover:bg-brand-green-dark' : 'bg-brand-brown hover:bg-brand-black'}`}
+                            className={`w-full py-4 mb-4 text-white font-bold rounded-xl hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 animate-pulse-subtle ${canSell ? 'bg-brand-red hover:bg-[#c4442b]' : 'bg-brand-brown hover:bg-brand-black'}`}
                         >
                             <div className="bg-white/20 p-2 rounded-full">
                                 <Store className="w-5 h-5" />

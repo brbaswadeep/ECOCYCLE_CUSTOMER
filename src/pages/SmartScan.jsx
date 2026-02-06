@@ -40,8 +40,10 @@ export default function SmartScan() {
         reader.readAsDataURL(file);
     };
 
+    const [uploadedImageUrl, setUploadedImageUrl] = useState(null); // Store uploaded URL
+
     const saveAnalysis = async (analysisData, imageUrl) => {
-        if (!currentUser) return;
+        if (!currentUser) return null;
 
         let downloadURL = null;
 
@@ -78,9 +80,11 @@ export default function SmartScan() {
                 // Inform user about partial success
                 alert("Analysis saved! (Image could not be saved due to network restrictions)");
             }
+            return downloadURL;
         } catch (err) {
             console.error("CRITICAL ERROR SAVING ANALYSIS:", err);
             alert(`Failed to save history: ${err.message}`);
+            return null;
         }
     };
 
@@ -92,7 +96,8 @@ export default function SmartScan() {
         try {
             const data = await analyzeWasteImage(image);
             setResult(data);
-            await saveAnalysis(data, image);
+            const url = await saveAnalysis(data, image);
+            setUploadedImageUrl(url);
         } catch (err) {
             setError(err.message || 'Failed to analyze image. Please try again.');
         } finally {
@@ -191,7 +196,8 @@ export default function SmartScan() {
                     <AnalysisResult
                         result={result}
                         image={preview}
-                        onReset={() => { setResult(null); setImage(null); setPreview(null); }}
+                        imageUrl={uploadedImageUrl}
+                        onReset={() => { setResult(null); setImage(null); setPreview(null); setUploadedImageUrl(null); }}
                         onDone={() => navigate('/dashboard')}
                     />
                 )}

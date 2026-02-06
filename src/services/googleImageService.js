@@ -22,7 +22,7 @@ export async function fetchProductImage(productName) {
         const query = encodeURIComponent(cleanName);
 
         // Unsplash API Configuration
-        const accessKey = "nHeNbfT93HCMFo2OLqyfQQD7LoVHNrvfqOXIYA3FV2g";
+        const accessKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY;
         const unsplashApiUrl = `https://api.unsplash.com/search/photos?query=${query}&per_page=1&orientation=landscape&content_filter=high`;
 
         // 1. Try Unsplash API

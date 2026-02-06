@@ -13,6 +13,7 @@ module.exports = {
                     orange: '#F4A460', // Secondary
                     brown: '#A0522D',  // Accent
                     black: '#000000',  // Text (Strict Black)
+                    green: '#2E8B57',  // Success/Nature
                 }
             }
         },

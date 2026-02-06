@@ -50,7 +50,8 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
                 {
                     ...item,
                     askingPrice: parseFloat(askingPrice),
-                    requestType: item.requestType || 'recycle'
+                    requestType: item.requestType || 'recycle',
+                    imageUrl: item.imageUrl // Explicitly ensure imageUrl is passed if needed (though spread handles it)
                 }, // Pass item details
                 vendors
             );
@@ -68,7 +69,7 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
 
                 {/* Header */}
-                <div className={`${item.requestType === 'sell' ? 'bg-brand-green' : 'bg-brand-brown'} p-6 text-white text-center transition-colors`}>
+                <div className={`${item.requestType === 'sell' ? 'bg-brand-red' : 'bg-brand-brown'} p-6 text-white text-center transition-colors`}>
                     <h2 className="text-xl font-bold">{item.requestType === 'sell' ? 'Sell to Local Vendors' : 'Request Pickup / Recycle'}</h2>
                     <p className="opacity-80 text-sm mt-1">{item.requestType === 'sell' ? 'Get paid for your recyclables' : 'Connecting with local recyclers'}</p>
                 </div>
@@ -204,7 +205,7 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
                     {requestStatus === 'found' && (
                         <button
                             onClick={handleConfirmRequest}
-                            className={`flex-1 py-3 px-4 rounded-xl font-bold text-white transition-colors shadow-lg ${item.requestType === 'sell' ? 'bg-brand-green hover:bg-brand-green-dark' : 'bg-brand-brown hover:bg-brand-black'}`}
+                            className={`flex-1 py-3 px-4 rounded-xl font-bold text-white transition-all shadow-lg transform active:scale-95 ${item.requestType === 'sell' ? 'bg-brand-red hover:bg-[#c4442b]' : 'bg-brand-brown hover:bg-brand-black'}`}
                         >
                             Confirm {item.requestType === 'sell' ? 'Sale' : 'Request'}
                         </button>

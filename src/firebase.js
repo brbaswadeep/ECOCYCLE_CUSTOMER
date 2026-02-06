@@ -6,13 +6,13 @@ import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyAfeZ7lh8j2vQhgzZycwXH1OIlCCLg_o2M",
-    authDomain: "ecocycle-b409a.firebaseapp.com",
-    projectId: "ecocycle-b409a",
-    storageBucket: "ecocycle-b409a.firebasestorage.app",
-    messagingSenderId: "457607732144",
-    appId: "1:457607732144:web:ca198ef5bfea9142735475",
-    measurementId: "G-TQ702HN3CQ"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);
