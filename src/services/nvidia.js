@@ -1,11 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = import.meta.env.VITE_NVIDIA_API_KEY;
-
 export async function analyzeImageWithNvidia(base64Image) {
-    if (!API_KEY) {
-        throw new Error("NVIDIA API Key is missing. Please check .env file.");
-    }
+    // API Key is now handled by the backend/proxy (Vite or Cloudflare)
 
     // Ensure base64 string is formatted correctly for the API (data URI)
     const formattedImage = base64Image.startsWith("data:image")
@@ -15,11 +11,8 @@ export async function analyzeImageWithNvidia(base64Image) {
     // Determine API URL based on environment
     // Dev: Use Vite proxy (/api/nvidia)
     // Prod: Use CORS Proxy + Direct URL
-    const isProd = import.meta.env.PROD;
-    const directUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
-    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(directUrl);
-
-    const apiUrl = isProd ? proxyUrl : '/api/nvidia/v1/chat/completions';
+    // Use the same endpoint for both dev (Vite proxy) and prod (Cloudflare Function)
+    const apiUrl = '/api/nvidia';
 
     try {
         const response = await fetch(
@@ -27,7 +20,6 @@ export async function analyzeImageWithNvidia(base64Image) {
             {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${API_KEY}`,
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
