@@ -8,8 +8,14 @@ export default defineConfig({
   ],
   server: {
     headers: {
-      "Cross-Origin-Opener-Policy": "unsafe-none",
-      "Cross-Origin-Embedder-Policy": "unsafe-none",
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
+    proxy: {
+      '/api/nvidia': {
+        target: 'https://integrate.api.nvidia.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/nvidia/, ''),
+      },
     },
   },
 })

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { analyzeWasteImage } from '../services/gemini';
+import { generateIdeasFromText } from '../services/gemini';
+import { analyzeImageWithNvidia } from '../services/nvidia';
 import { Upload, Camera, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AnalysisResult from '../components/AnalysisResult';
@@ -12,6 +13,7 @@ export default function SmartScan() {
     const [image, setImage] = useState(null);
     const [preview, setPreview] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
+    const [statusText, setStatusText] = useState('Analyzing...'); // New state for granular feedback
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
     const navigate = useNavigate();
@@ -92,16 +94,27 @@ export default function SmartScan() {
         if (!image) return;
 
         setAnalyzing(true);
+        setStatusText('Identifying Item (NVIDIA)...');
         setError('');
         try {
-            const data = await analyzeWasteImage(image);
+            // Step 1: NVIDIA Analysis
+            console.log("Starting NVIDIA Analysis...");
+            const nvidiaAnalysis = await analyzeImageWithNvidia(image);
+            console.log("NVIDIA Result:", nvidiaAnalysis);
+
+            // Step 2: Gemini Ideas
+            setStatusText('Generating Ideas (Gemini)...');
+            const data = await generateIdeasFromText(nvidiaAnalysis);
+
             setResult(data);
             const url = await saveAnalysis(data, image);
             setUploadedImageUrl(url);
         } catch (err) {
+            console.error("Analysis Pipeline Error:", err);
             setError(err.message || 'Failed to analyze image. Please try again.');
         } finally {
             setAnalyzing(false);
+            setStatusText('Analyzing...');
         }
     };
 
@@ -169,7 +182,7 @@ export default function SmartScan() {
                                         {analyzing ? (
                                             <>
                                                 <Loader2 className="w-5 h-5 animate-spin" />
-                                                Analyzing...
+                                                {statusText}
                                             </>
                                         ) : (
                                             <>

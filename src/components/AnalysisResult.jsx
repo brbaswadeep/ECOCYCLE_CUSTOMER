@@ -140,23 +140,19 @@ export default function AnalysisResult({ result, image, imageUrl, onReset, onDon
                 {/* Left Column: Analysis Details */}
                 <div className="space-y-6">
                     <AnalysisCard title="Quality Assessment">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-3 gap-4">
                             <div className="p-3 bg-brand-cream/30 rounded-xl">
                                 <div className="text-xs text-brand-brown/60 font-bold uppercase">Condition</div>
-                                <div className="font-medium text-brand-brown capitalize">{result.quality_assessment?.cleanliness_level?.replace('_', ' ')}</div>
+                                <div className="font-medium text-brand-brown capitalize">{result.quality_assessment?.cleanliness_level?.replace('_', ' ') || "N/A"}</div>
                             </div>
                             <div className="p-3 bg-brand-cream/30 rounded-xl">
                                 <div className="text-xs text-brand-brown/60 font-bold uppercase">Damage</div>
-                                <div className="font-medium text-brand-brown capitalize">{result.quality_assessment?.damage_level?.replace('_', ' ')}</div>
+                                <div className="font-medium text-brand-brown capitalize">{result.quality_assessment?.damage_level?.replace('_', ' ') || "N/A"}</div>
                             </div>
                             <div className="p-3 bg-brand-cream/30 rounded-xl">
-                                <div className="text-xs text-brand-brown/60 font-bold uppercase">Reusability</div>
-                                <div className="font-medium text-brand-brown">{(result.quality_assessment?.reusability_score * 100).toFixed(0)}%</div>
-                            </div>
-                            <div className="p-3 bg-brand-cream/30 rounded-xl">
-                                <div className="text-xs text-brand-brown/60 font-bold uppercase">Weight/Vol</div>
+                                <div className="text-xs text-brand-brown/60 font-bold uppercase">Weight</div>
                                 <div className="font-medium text-brand-brown">
-                                    {result.quantity_estimation?.approximate_weight_kg}kg / {result.quantity_estimation?.volume_estimate_liters}L
+                                    {result.quantity_estimation?.approximate_weight_kg || 0}kg
                                 </div>
                             </div>
                         </div>
@@ -171,9 +167,6 @@ export default function AnalysisResult({ result, image, imageUrl, onReset, onDon
                         </div>
 
                         {/* Action Button for Vendor Request */}
-                        {/* Action Button for Selling - ONLY if value exists */}
-                        {/* Action Button for Selling - APPEARS for all sellable materials */}
-                        {/* Action Button for Selling/Recycling - ALWAYS VISIBLE */}
                         <button
                             onClick={() => handleVendorRequest(null)}
                             className={`w-full py-4 mb-4 text-white font-bold rounded-xl hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 animate-pulse-subtle ${canSell ? 'bg-brand-red hover:bg-[#c4442b]' : 'bg-brand-brown hover:bg-brand-black'}`}
@@ -189,20 +182,7 @@ export default function AnalysisResult({ result, image, imageUrl, onReset, onDon
                                     {estimatedValue > 0 ? `Get ₹${estimatedValue} Cash` : (canSell ? 'Get Best Quote' : 'Sell / Request Pickup')}
                                 </span>
                             </div>
-                        </button>                        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                            <div className="bg-white p-2 rounded-lg border border-brand-brown/10">
-                                <div className="font-bold text-brand-brown">Feasibility</div>
-                                <div className="text-brand-orange">High</div>
-                            </div>
-                            <div className="bg-white p-2 rounded-lg border border-brand-brown/10">
-                                <div className="font-bold text-brand-brown">Economic</div>
-                                <div className="text-brand-green">Good</div>
-                            </div>
-                            <div className="bg-white p-2 rounded-lg border border-brand-brown/10">
-                                <div className="font-bold text-brand-brown">Eco Impact</div>
-                                <div className="text-brand-blue">Positive</div>
-                            </div>
-                        </div>
+                        </button>
                     </AnalysisCard>
                 </div>
 

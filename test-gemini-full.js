@@ -1,13 +1,14 @@
+
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; // User provided key
+const API_KEY = "AIzaSyC7D6oj9_6DMOgDFmc1TRok9lGUWsUitBg"; // Key from .env
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
-  generationConfig: {
-    maxOutputTokens: 8192,
-    temperature: 0.7,
-  }
+    model: "gemini-2.5-flash",
+    generationConfig: {
+        maxOutputTokens: 2000,
+        temperature: 0.7,
+    }
 });
 
 const SYSTEM_PROMPT = `
@@ -200,12 +201,8 @@ Structure final JSON exactly as follows:
                 {
                     "product_name": "Industrial Curtain Rod",
                     "conversion_type": "DIY",
-                    "description": "A robust industrial-style curtain rod that adds rustic charm.",
-                    "step_by_step_instructions": [
-                        "Clean the iron pipe thoroughly to remove rust.",
-                        "Apply a coat of anti-rust paint.",
-                        "Mount using standard wall brackets."
-                    ],
+                    "description": "Transform this old iron pipe into a robust industrial-style curtain rod. Clean it thoroughly and mount it using simple wall brackets. It adds a rustic charm to your living room while being extremely durable.",
+                    "required_processing": "Cleaning, Painting",
                     "difficulty_level": "Easy",
                     "estimated_market_value_inr": 450
                 },
@@ -224,145 +221,48 @@ Structure final JSON exactly as follows:
         - "approximate_market_value" MUST be filled if the item matches the rate card. If not, set to 0.
     `;
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Small red dot jpeg base64
+const DUMMY_IMAGE = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIMFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KKKKAP/2Q==";
 
-export async function analyzeWasteImage(base64Image) {
-  const maxRetries = 3;
-  let attempt = 0;
-
-  while (attempt < maxRetries) {
+async function run() {
     try {
-      // Remove header if present (e.g., "data:image/jpeg;base64,")
-      const imageParts = [
-        {
-          inlineData: {
-            data: base64Image.split(",")[1] || base64Image,
-            mimeType: "image/jpeg",
-          },
-        },
-      ];
+        console.log("Analyzing image...");
+        const imageParts = [{
+            inlineData: {
+                data: DUMMY_IMAGE.split(",")[1],
+                mimeType: "image/jpeg",
+            },
+        }];
 
-      const result = await model.generateContent([SYSTEM_PROMPT, ...imageParts]);
-      const response = await result.response;
-      const text = response.text();
-      console.log("RAW GEMINI RESPONSE:", text);
+        const result = await model.generateContent([SYSTEM_PROMPT, ...imageParts]);
+        const response = await result.response;
+        // Text might be missing or blocked
+        try {
+            const text = response.text();
+            console.log("RAW RESPONSE START ----------------");
+            console.log(text);
+            console.log("RAW RESPONSE END ------------------");
 
-      // Robust JSON extraction: Find the first '{' and the last '}'
-      const startIndex = text.indexOf('{');
-      const endIndex = text.lastIndexOf('}');
+            // Robust JSON extraction
+            const startIndex = text.indexOf('{');
+            const endIndex = text.lastIndexOf('}');
+            if (startIndex === -1 || endIndex === -1) {
+                console.error("FAILED TO FIND JSON BRACKETS");
+            } else {
+                const jsonString = text.substring(startIndex, endIndex + 1);
+                // JSON.parse might fail if there are comments or trailing commas
+                const data = JSON.parse(jsonString);
+                console.log("SUCCESSFULLY PARSED JSON");
+            }
 
-      if (startIndex === -1 || endIndex === -1) {
-        throw new Error("Invalid response format from AI");
-      }
-
-      const jsonString = text.substring(startIndex, endIndex + 1);
-      return JSON.parse(jsonString);
-
-    } catch (error) {
-      console.error(`Gemini Analysis Error (Attempt ${attempt + 1}/${maxRetries}):`, error);
-
-      // Handle both 429 (Too Many Requests) and 503 (Service Unavailable/Overloaded)
-      if (error.message.includes("429") || error.status === 429 || error.message.includes("503") || error.status === 503) {
-        attempt++;
-        if (attempt < maxRetries) {
-          const waitTime = 2000 * Math.pow(2, attempt); // Exponential backoff: 4s, 8s, 16s
-          console.log(`Service overloaded or rate limit hit. Retrying in ${waitTime}ms...`);
-          await delay(waitTime);
-          continue;
+        } catch (e) {
+            console.log("Could not get text() from response. Check for safety blocks.");
+            console.log(JSON.stringify(result, null, 2));
         }
-      }
-      // For other errors, or if retries exhausted, throw
-      if (attempt === maxRetries) {
-        throw new Error("Service is currently experiencing high traffic. We tried multiple times but failed. Please try again in a minute.");
-      }
-      throw new Error("Failed to analyze image. Please try again.");
-    }
-  }
 
+    } catch (e) {
+        console.error("ERROR:", e);
+    }
 }
 
-export async function generateIdeasFromText(nvidiaAnalysisText) {
-  const maxRetries = 3;
-  let attempt = 0;
-
-  const TEXT_SYSTEM_PROMPT = `
-You are a creative eco-friendly assistant.
-INPUT: Visual description of a waste item.
-TASK: Generate structured JSON with upcycling ideas & PRECISE PRICING.
-
-INPUT ANALYSIS:
-"${nvidiaAnalysisText}"
-
-STRICT CONSTRAINTS:
-1. OUTPUT: Valid JSON ONLY. No Markdown.
-2. LENGTH: MAX 500 TOKENS total.
-3. CURRENCY: INR (₹).
-4. QUANTITY: EXACTLY 3 IDEAS.
-
-CONVERSION OPTIONS (Exact 3 ideas):
-- Value: ₹100 - ₹300 (STRICT).
-- Product Name: Perfect title.
-- Description: Perfect short summary (2-3 lines).
-- Step-by-Step Instructions: Array of 3-4 short, precise steps.
-
-CALCULATIONS:
-- Vendor_Gross_Value = BMV * Weight_kg * QF * EF * PVM
-- Max_Allowed_Price = New_Product_Price * 0.8 (20% Green Discount)
-- Final_Selling_Price = MIN(Vendor_Gross_Value, Max_Allowed_Price)
-- Vendor_Payout = Final_Selling_Price * 0.85 (15% Commission)
-
-JSON STRUCTURE:
-{
-  "waste_analysis": {
-    "detected_items": [{ "material_type": "string", "specific_object": "string", "confidence_score": 0.9 }]
-  },
-  "quantity_estimation": { "approximate_weight_kg": number },
-  "environmental_impact": { "sustainability_score": number },
-  "quality_assessment": { "cleanliness_level": "string", "damage_level": "string", "contamination_risk": "string" },
-  "conversion_options": [
-    {
-      "product_name": "string",
-      "conversion_type": "DIY",
-      "description": "string",
-      "step_by_step_instructions": ["Step 1", "Step 2", "Step 3"],
-      "difficulty_level": "Easy",
-      "pricing_analysis": {
-        "base_material_value_per_kg": number,
-        "quality_factor": number,
-        "effort_factor": number,
-        "product_value_multiplier": number,
-        "vendor_gross_value": number,
-        "final_selling_price": number,
-        "vendor_payout": number
-      }
-    }
-  ],
-  "best_recommendation": { "recommended_option": "string", "reasoning": "string" }
-}
-`;
-
-  while (attempt < maxRetries) {
-    try {
-      const result = await model.generateContent(TEXT_SYSTEM_PROMPT);
-      const response = await result.response;
-      const text = response.text();
-      console.log("RAW GEMINI RESPONSE (Text-to-JSON):", text);
-
-      const startIndex = text.indexOf('{');
-      const endIndex = text.lastIndexOf('}');
-      if (startIndex === -1 || endIndex === -1) throw new Error("Invalid response format");
-
-      return JSON.parse(text.substring(startIndex, endIndex + 1));
-    } catch (error) {
-      console.error(`Gemini Text Analysis Error (Attempt ${attempt + 1})`, error);
-      if (error.message.includes("429") || error.message.includes("503")) {
-        attempt++;
-        if (attempt < maxRetries) {
-          await delay(2000 * Math.pow(2, attempt));
-          continue;
-        }
-      }
-      throw error;
-    }
-  }
-}
+run();

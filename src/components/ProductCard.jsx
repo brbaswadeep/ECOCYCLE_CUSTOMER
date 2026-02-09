@@ -31,6 +31,7 @@ export default function ProductCard({ option, index, onImageLoad, onAction }) {
     };
 
     const getTotalCost = () => {
+        if (option.pricing_analysis) return option.pricing_analysis.final_selling_price;
         if (!option.cost_breakdown) return option.estimated_conversion_cost_inr || 0;
         let total = option.cost_breakdown.customer_display_mfg_price;
         if (includeLogistics) {
@@ -114,11 +115,7 @@ export default function ProductCard({ option, index, onImageLoad, onAction }) {
                 {/* Expanded Details */}
                 {expanded && (
                     <div className="mt-4 pt-4 border-t border-brand-brown/10 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                        {/* Daily Use Case */}
-                        <div className="bg-brand-brown/5 p-3 rounded-xl border border-brand-brown/10">
-                            <div className="text-xs font-bold text-brand-brown/60 uppercase mb-1">Daily Use Case</div>
-                            <p className="text-sm text-brand-brown italic">"{option.daily_use_case}"</p>
-                        </div>
+                        {/* Daily Use Case - REMOVED */}
 
                         {/* Analysis Factors & Weight */}
                         {option.analysis_factors && (
@@ -192,31 +189,23 @@ export default function ProductCard({ option, index, onImageLoad, onAction }) {
                             </div>
                         )}
 
-                        {/* Detailed Cost Breakdown with Toggle */}
-                        {option.cost_breakdown && (
+                        {/* Pricing Analysis - HIDDEN (Internal Calculation Only) */}
+                        {/* 
+                        {option.pricing_analysis && (
+                            <div className="bg-brand-brown/5 rounded-xl p-4 space-y-3 border border-brand-brown/10">
+                                ... (Hidden for cleaner UI) ...
+                            </div>
+                        )} 
+                        */}
+
+                        {/* Legacy Cost Breakdown (Fallback) */}
+                        {!option.pricing_analysis && option.cost_breakdown && (
                             <div className="bg-brand-cream/30 rounded-xl p-3 space-y-2">
                                 <div className="text-xs font-bold text-brand-brown/60 uppercase border-b border-brand-brown/10 pb-1">Cost Estimation</div>
-
                                 <div className="flex justify-between text-xs items-center">
                                     <span className="text-brand-brown/80">Manufacturing (Inc. Tax):</span>
                                     <span className="font-bold text-brand-brown">₹{option.cost_breakdown.customer_display_mfg_price}</span>
                                 </div>
-
-                                <div className="flex justify-between text-xs items-center pt-1">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={includeLogistics}
-                                            onChange={(e) => setIncludeLogistics(e.target.checked)}
-                                            className="rounded text-brand-green focus:ring-brand-green"
-                                        />
-                                        <span className="text-brand-brown/80">Include Pickup & Delivery</span>
-                                    </label>
-                                    <span className={`font-bold ${includeLogistics ? 'text-brand-brown' : 'text-gray-400'}`}>
-                                        + ₹{option.cost_breakdown.logistics_cost}
-                                    </span>
-                                </div>
-
                                 <div className="flex justify-between text-xs pt-2 border-t border-brand-brown/10 mt-1">
                                     <span className="font-bold text-brand-brown">Total Estimated:</span>
                                     <span className="font-bold text-brand-green text-sm">₹{getTotalCost()}</span>
@@ -224,10 +213,7 @@ export default function ProductCard({ option, index, onImageLoad, onAction }) {
                             </div>
                         )}
 
-                        <div>
-                            <div className="text-xs font-bold text-brand-brown/60 uppercase mb-1">Processing</div>
-                            <p className="text-sm text-brand-brown">{option.required_processing}</p>
-                        </div>
+                        {/* Processing - REMOVED */}
 
                         {option.feasibility_score && (
                             <div>
