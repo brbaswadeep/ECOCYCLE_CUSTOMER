@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, orderBy, getDocs, where, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, where, deleteDoc, doc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { useNavigate } from 'react-router-dom';
@@ -131,47 +131,69 @@ export default function History() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        async function fetchData() {
+        let unsubscribeRequests;
+        let unsubscribeHistory;
+
+        async function setupListeners() {
             if (!currentUser) return;
+            setLoading(true);
             try {
-                // Fetch Requests (Orders)
+                // 1. Requests (Orders) Listener
                 const requestsRef = collection(db, "requests");
-                // Note: Index required for composite query if ordering
                 const requestsQ = query(
                     requestsRef,
                     where("customerId", "==", currentUser.uid)
-                    // orderBy("createdAt", "desc") 
                 );
-                const requestsSnapshot = await getDocs(requestsQ);
-                const loadedRequests = requestsSnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                // Sort manually
-                loadedRequests.sort((a, b) => {
-                    const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
-                    const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
-                    return dateB - dateA;
-                });
-                setRequests(loadedRequests);
 
-                // Fetch Scan History
+                console.log("Setting up listener for requests for user:", currentUser.uid);
+
+                unsubscribeRequests = onSnapshot(requestsQ, (snapshot) => {
+                    console.log("Requests snapshot received, docs count:", snapshot.size);
+                    const loadedRequests = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+
+                    // Sort manually - robust date handling
+                    loadedRequests.sort((a, b) => {
+                        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+                        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+                        return dateB - dateA;
+                    });
+
+                    setRequests(loadedRequests);
+                }, (error) => {
+                    console.error("Error listening to requests:", error);
+                });
+
+                // 2. Scan History Listener
                 const historyRef = collection(db, "customers", currentUser.uid, "history");
                 const historyQ = query(historyRef, orderBy("timestamp", "desc"));
-                const historySnapshot = await getDocs(historyQ);
-                const loadedHistory = historySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-                setHistory(loadedHistory);
+
+                unsubscribeHistory = onSnapshot(historyQ, (snapshot) => {
+                    const loadedHistory = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    setHistory(loadedHistory);
+                    setLoading(false); // Stop loading after initial data
+                }, (error) => {
+                    console.error("Error listening to history:", error);
+                    setLoading(false);
+                });
 
             } catch (error) {
-                console.error("Error fetching data:", error);
-            } finally {
+                console.error("Error setting up listeners:", error);
                 setLoading(false);
             }
         }
-        fetchData();
+
+        setupListeners();
+
+        return () => {
+            if (unsubscribeRequests) unsubscribeRequests();
+            if (unsubscribeHistory) unsubscribeHistory();
+        };
     }, [currentUser]);
 
     if (loading) {
