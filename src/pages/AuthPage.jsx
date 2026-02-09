@@ -26,6 +26,26 @@ export default function AuthPage() {
     const { login, signup, googleSignIn, resetPassword } = useAuth();
     const navigate = useNavigate();
 
+    const executeRecaptcha = (action) => {
+        return new Promise((resolve) => {
+            if (!window.grecaptcha) {
+                console.error("reCAPTCHA not loaded");
+                resolve(null);
+                return;
+            }
+            window.grecaptcha.enterprise.ready(async () => {
+                try {
+                    const token = await window.grecaptcha.enterprise.execute('6Lf4N2UsAAAAANhe_R1rRUZ22M-giKsMGAYom4R6', { action });
+                    console.log(`Recaptcha Token Generated (${action}):`, token);
+                    resolve(token);
+                } catch (error) {
+                    console.error("reCAPTCHA execution failed:", error);
+                    resolve(null);
+                }
+            });
+        });
+    };
+
     async function handleSubmit(e) {
         e.preventDefault();
         setError('');
@@ -37,6 +57,12 @@ export default function AuthPage() {
         setLoading(true);
 
         try {
+            // Generate reCAPTCHA Token
+            const token = await executeRecaptcha(isLogin ? 'LOGIN' : 'SIGNUP');
+
+            // In a real backend implementation, you would send this token to your server for verification.
+            // For now, we proceed if the token is generated (or even if it fails gracefully as we are frontend-only).
+
             if (isLogin) {
                 await login(email, password, rememberMe);
             } else {
@@ -54,6 +80,10 @@ export default function AuthPage() {
         try {
             setError('');
             setLoading(true);
+
+            // Generate reCAPTCHA Token for Google Sign In
+            await executeRecaptcha('GOOGLE_SIGNIN');
+
             await googleSignIn();
             navigate('/dashboard');
         } catch (err) {

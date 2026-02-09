@@ -12,9 +12,18 @@ export async function analyzeImageWithNvidia(base64Image) {
         ? base64Image
         : `data:image/jpeg;base64,${base64Image}`;
 
+    // Determine API URL based on environment
+    // Dev: Use Vite proxy (/api/nvidia)
+    // Prod: Use CORS Proxy + Direct URL
+    const isProd = import.meta.env.PROD;
+    const directUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
+    const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(directUrl);
+
+    const apiUrl = isProd ? proxyUrl : '/api/nvidia/v1/chat/completions';
+
     try {
         const response = await fetch(
-            '/api/nvidia/v1/chat/completions',
+            apiUrl,
             {
                 method: 'POST',
                 headers: {

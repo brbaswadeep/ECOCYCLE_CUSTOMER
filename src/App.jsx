@@ -14,8 +14,33 @@ import Messages from './pages/Messages';
 import Shop from './pages/Shop';
 import ProtectedRoute from './components/ProtectedRoute';
 
+import React, { useEffect } from 'react';
+
 function App() {
   const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+  useEffect(() => {
+    const handleUnhandledRejection = (event) => {
+      // Check for Firestore "blocked by client" errors (often due to AdBlockers)
+      if (event.reason && (
+        event.reason.code === 'unavailable' ||
+        event.reason.message?.includes('ERR_BLOCKED_BY_CLIENT') ||
+        event.reason.toString().includes('ERR_BLOCKED_BY_CLIENT')
+      )) {
+        // Prevent default console error if possible (though often not for network errors)
+        // event.preventDefault(); 
+
+        // Show user-friendly alert (can be replaced with a Toast)
+        alert("Connection Issue Detected: It seems your browser or an extension (like an AdBlocker) is blocking access to our database. Please disable ad blockers for this site to continue.");
+      }
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
 
   return (
     <BrowserRouter>
