@@ -1,6 +1,28 @@
 
-const API_KEY = "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";
-const DUMMY_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/Plastic_bottle_on_beach.jpg/640px-Plastic_bottle_on_beach.jpg";
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function getEnvVar(key) {
+    try {
+        const envPath = path.resolve(__dirname, '.env');
+        const envFile = fs.readFileSync(envPath, 'utf8');
+        const match = envFile.match(new RegExp(`^${key}=(.*)$`, 'm'));
+        return match ? match[1].trim() : null;
+    } catch (e) {
+        console.error("Error reading .env file:", e);
+        return null;
+    }
+}
+
+const API_KEY = getEnvVar('VITE_NVIDIA_API_KEY');
+
+if (!API_KEY) {
+    console.error("Error: VITE_NVIDIA_API_KEY not found in .env file");
+    process.exit(1);
+}
 
 async function testNvidia() {
     console.log("Testing NVIDIA API...");
