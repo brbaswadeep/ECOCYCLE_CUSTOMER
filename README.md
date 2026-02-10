@@ -1,41 +1,44 @@
 <div align="center">
   <img src="public/favicon.png" alt="EcoCycle Logo" width="120" />
   <h1>EcoCycle Web</h1>
-  <p><strong>Intelligent Waste Management & Vendor Ecosystem</strong></p>
+  <p><strong>Omni-AI Waste Management powered by NVIDIA, OpenAI & Gemini</strong></p>
   
-  [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
-  [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-  [![Firebase](https://img.shields.io/badge/firebase-%23039BE5.svg?style=for-the-badge&logo=firebase)](https://firebase.google.com/)
-  [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+  [![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white)](https://www.nvidia.com/en-us/ai-data-science/)
+  [![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com/)
+  [![Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)](https://deepmind.google/technologies/gemini/)
 </div>
 
 ---
 
 ## 🌿 Overview
 
-**EcoCycle Web** is the central management hub for the EcoCycle ecosystem. It provides vendors and administrators with the tools to manage recycling requests, track customer interactions, and maintain a sustainable marketplace. Powered by AI and real-time data, it bridges the gap between waste generators and recyclers.
+**EcoCycle Web** is an advanced AI ecosystem designed to revolutionize waste management. By orchestrating a multi-model workflow involving **NVIDIA's vision models**, **OpenAI's reasoning**, and **Google's Gemini**, it provides a seamless transition from raw waste to sustainable value.
 
-## ✨ Key Features
+## 🤖 The EcoCycle AI Lifecycle
 
-- 📊 **Vendor Dashboard**: Real-time analytics on requests, earnings, and service efficiency.
-- ♻️ **Request Management**: Seamlessly handle "Sell" and "Recyle" requests from customers.
-- 💬 **Real-time Messaging**: Built-in chat system for direct communication between vendors and customers.
-- 🔍 **Smart Scan Admin**: Verification tools for AI-categorized waste items.
-- 🛒 **Store Management**: Manage product listings and orders in the integrated EcoShop.
-- 📍 **Location Intelligence**: Google Maps integration for service area management and tracking.
+EcoCycle employs a "Best-in-Class" AI strategy to ensure maximum accuracy and creativity:
 
-## 🛠 Tech Stack
+1.  **NVIDIA (Precision Scanning)**: Utilizing high-performance vision models (Llama-3.2-11b-vision-instruct) hosted on NVIDIA's infrastructure to perform ultra-fast, clinical-grade scanning and identification of waste materials.
+2.  **OpenAI (Idea Generation)**: The identified materials are processed by OpenAI's advanced reasoning models to generate creative upcycling ideas, monetization strategies, and complex lifecycle logic.
+3.  **Google Gemini (EcoBot)**: Powers our conversational AI assistant, providing real-time, context-aware support and educating users on sustainable practices.
 
+## ✨ Key Features (Multi-AI)
+
+- 🔍 **NVIDIA Vision Support**: Professional-grade object detection for waste categorization.
+- 💡 **OpenAI Idea Engine**: Dynamic generation of "Waste-to-Wealth" opportunities.
+- 🤖 **Gemini EcoBot**: Personalized, intelligent support for every user.
+- 📊 **Smart Admin Hub**: Real-time analytics and AI-driven insights on service efficiency.
+- ♻️ **Request Lifecycle**: Automated handling of "Sell" and "Recyle" requests with intelligent valuation.
+
+## � Tech Stack
+
+- **AI Platforms**: 
+  - **NVIDIA NIM**: Vision-based identification.
+  - **OpenAI**: Core logic and creative brainstorming.
+  - **Google Gemini**: Conversational EcoBot.
 - **Frontend**: React 19.2 + Vite
-- **Styling**: Tailwind CSS for a modern, responsive UI
-- **Backend-as-a-Service**: Firebase
-  - **Firestore**: Real-time NoSQL database
-  - **Authentication**: Secure multi-method login
-  - **Storage**: Image and document management
-  - **Hosting**: Fast and secure content delivery
-- **AI Integration**: Google Generative AI (Gemini 2.0)
-- **Maps**: Google Maps Extended Component Library
-- **Icons**: Lucide React
+- **Styling**: Tailwind CSS
+- **Backend**: Firebase (Firestore, Auth, Storage)
 
 ## 🚀 Getting Started
 
