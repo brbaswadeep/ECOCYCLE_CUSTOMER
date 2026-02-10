@@ -9,6 +9,7 @@ import SmartScan from './pages/SmartScan';
 import History from './pages/History';
 import HistoryDetail from './pages/HistoryDetail';
 import OrderDetails from './pages/OrderDetails';
+import StoreOrderDetails from './pages/StoreOrderDetails';
 import Profile from './pages/Profile';
 import Messages from './pages/Messages';
 import Shop from './pages/Shop';
@@ -111,6 +112,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <OrderDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/store-orders/:orderId"
+              element={
+                <ProtectedRoute>
+                  <StoreOrderDetails />
                 </ProtectedRoute>
               }
             />

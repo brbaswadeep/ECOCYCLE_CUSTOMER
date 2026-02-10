@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn, User, LayoutDashboard, History, MapPin, Scan, Menu, X, LogOut, Leaf, MessageCircle, ShoppingBag } from 'lucide-react';
+import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import logo from '../assets/logo.png';
 import LocationRequiredPopup from '../components/LocationRequiredPopup';
 import EcoBot from '../components/EcoBot';
@@ -15,6 +17,25 @@ export default function Layout() {
     React.useEffect(() => {
         setIsMobileMenuOpen(false);
     }, [location.pathname]);
+
+    // Track unread messages
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    React.useEffect(() => {
+        if (!currentUser) return;
+        const q = query(
+            collection(db, 'chats'),
+            where('participants', 'array-contains', currentUser.uid)
+        );
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            let count = 0;
+            snapshot.forEach(doc => {
+                count += (doc.data().unreadCount?.[currentUser.uid] || 0);
+            });
+            setUnreadCount(count);
+        });
+        return () => unsubscribe();
+    }, [currentUser]);
 
     return (
         <div className="flex h-screen bg-brand-cream overflow-hidden font-sans">
@@ -35,7 +56,7 @@ export default function Layout() {
                     <div className="space-y-4">
                         <NavLink to="/dashboard" icon={<LayoutDashboard size={24} />} label="Dashboard" active={location.pathname === '/dashboard'} />
                         <NavLink to="/shop" icon={<ShoppingBag size={24} />} label="Shop" active={location.pathname === '/shop'} />
-                        <NavLink to="/messages" icon={<MessageCircle size={24} />} label="Messages" active={location.pathname === '/messages'} />
+                        <NavLink to="/messages" icon={<MessageCircle size={24} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
                         <NavLink to="/history" icon={<History size={24} />} label="My Activity" active={location.pathname === '/history'} />
                     </div>
 
@@ -98,7 +119,7 @@ export default function Layout() {
                             <div className="space-y-2">
                                 <NavLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" active={location.pathname === '/dashboard'} />
                                 <NavLink to="/shop" icon={<ShoppingBag size={20} />} label="Shop" active={location.pathname === '/shop'} />
-                                <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} />
+                                <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
                                 <NavLink to="/history" icon={<History size={20} />} label="My Activity" active={location.pathname === '/history'} />
                                 <NavLink to="/smart-scan" icon={<Scan size={20} />} label="Smart Scan" active={location.pathname === '/smart-scan'} />
                                 <div className="h-px bg-brand-brown/10 my-4" />
@@ -121,7 +142,7 @@ export default function Layout() {
     );
 }
 
-function NavLink({ to, icon, label, active }) {
+function NavLink({ to, icon, label, active, badge }) {
     return (
         <Link
             to={to}
@@ -131,7 +152,12 @@ function NavLink({ to, icon, label, active }) {
                 }`}
         >
             <div className={`${active ? 'text-white' : 'text-current'}`}>{icon}</div>
-            <span>{label}</span>
+            <span className="flex-1">{label}</span>
+            {badge > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${active ? 'bg-white text-brand-brown' : 'bg-red-500 text-white'}`}>
+                    {badge > 99 ? '99+' : badge}
+                </span>
+            )}
         </Link>
     );
 }

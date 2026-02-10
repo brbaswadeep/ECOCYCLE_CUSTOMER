@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, orderBy, onSnapshot, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, getDoc, doc, updateDoc } from 'firebase/firestore';
 import { MessageCircle, User, Loader2, Clock } from 'lucide-react';
 import ChatModal from '../components/ChatModal';
 
@@ -78,7 +78,16 @@ export default function Messages() {
                         return (
                             <div
                                 key={chat.id}
-                                onClick={() => setSelectedChat({ ...chat, otherName, otherId })}
+                                onClick={async () => {
+                                    setSelectedChat({ ...chat, otherName, otherId });
+                                    if (chat.unreadCount?.[currentUser.uid] > 0) {
+                                        try {
+                                            await updateDoc(doc(db, 'chats', chat.id), {
+                                                [`unreadCount.${currentUser.uid}`]: 0
+                                            });
+                                        } catch (err) { console.error("Error marking read:", err); }
+                                    }
+                                }}
                                 className="bg-white p-5 rounded-[2rem] shadow-sm border border-brand-brown/5 hover:shadow-md transition-all cursor-pointer group hover:-translate-y-1"
                             >
                                 <div className="flex items-center gap-4 mb-3">

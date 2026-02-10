@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { collection, query, orderBy, getDocs, where, deleteDoc, doc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, ArrowRight, Loader2, PackageOpen, Trash2, Truck, PlayCircle, Hourglass, CheckSquare, Clock, Star } from 'lucide-react';
+import { Calendar, ArrowRight, Loader2, PackageOpen, Trash2, Truck, PlayCircle, Hourglass, CheckSquare, Clock, Star, CheckCircle } from 'lucide-react';
+import InvoiceModal from '../components/InvoiceModal';
 
 const TRACKING_STAGES = [
     { id: 'accepted', label: 'Accepted', icon: CheckSquare },
@@ -12,19 +13,41 @@ const TRACKING_STAGES = [
     { id: 'initiated', label: 'Initiated', icon: PlayCircle },
     { id: 'processing', label: 'Processing', icon: Hourglass },
     { id: 'finishing', label: 'Finishing', icon: Clock },
-    { id: 'completed', label: 'Ready', icon: CheckSquare }
+    { id: 'completed', label: 'Delivered', icon: CheckCircle }
 ];
 
-function RequestCard({ req, onRate }) {
+function RequestCard({ req, onRate, onInvoice }) {
     const isCompleted = req.projectMeta?.trackingStage === 'completed';
+    // Check if store order based on fields (e.g. productId or priceBreakdown or just 'type' if we injected it, but req comes from Firestore data mostly)
+    // We injected 'type' in the hook below, or we check props.
+    const isStoreOrder = req.type === 'order' || !!req.productId;
     const isRated = !!req.userRating;
     const navigate = useNavigate();
 
+    // Formatting Date
+    const dateObj = req.createdAt?.toDate ? req.createdAt.toDate() : new Date(req.createdAt?.seconds * 1000 || 0);
+    const dateStr = dateObj.toLocaleDateString();
+
+    const handleClick = () => {
+        if (isStoreOrder) {
+            navigate(`/store-orders/${req.id}`);
+        } else {
+            navigate(`/orders/${req.id}`);
+        }
+    };
+
     return (
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-brand-brown/10 flex flex-col md:flex-row gap-6 cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/orders/${req.id}`)}>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-brand-brown/10 flex flex-col md:flex-row gap-6 cursor-pointer hover:shadow-md transition-shadow" onClick={handleClick}>
             {/* Image */}
             <div className="w-full md:w-32 h-32 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                {req.itemImage && <img src={req.itemImage} alt="Item" className="w-full h-full object-cover" />}
+                {(req.itemImage || req.productImage) && (
+                    <img src={req.itemImage || req.productImage} alt="Item" className="w-full h-full object-cover" />
+                )}
+                {!(req.itemImage || req.productImage) && (
+                    <div className="flex items-center justify-center h-full text-brand-brown/20 bg-brand-cream">
+                        <PackageOpen size={32} />
+                    </div>
+                )}
             </div>
 
             {/* Content */}
@@ -32,28 +55,35 @@ function RequestCard({ req, onRate }) {
                 <div className="flex justify-between items-start mb-4">
                     <div>
                         <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase mb-2 ${req.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                            req.status === 'accepted' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            ['accepted', 'shipped', 'delivered'].includes(req.status) ? 'bg-green-100 text-green-700' :
+                                'bg-red-100 text-red-700'
                             }`}>
-                            {req.status === 'accepted' ? (isCompleted ? 'Completed' : 'In Progress') : req.status}
+                            {req.status === 'accepted' && !isStoreOrder ? (isCompleted ? 'Completed' : 'In Progress') : req.status}
                         </div>
-                        <h3 className="text-xl font-bold text-brand-brown">{req.itemDetails?.goal || "Recycling Request"}</h3>
+                        <h3 className="text-xl font-bold text-brand-brown">
+                            {req.itemDetails?.goal || req.productName || "Order"}
+                        </h3>
                         <p className="text-sm text-brand-brown/60">
-                            Ordered: {req.createdAt?.toDate ? req.createdAt.toDate().toLocaleDateString() : 'N/A'}
+                            {isStoreOrder ? 'Ordered' : 'Requested'}: {dateStr}
                         </p>
                     </div>
-                    {req.projectMeta?.estimatedCompletion && !isCompleted && (
+
+                    {/* Est Completion for Service Requests */}
+                    {!isStoreOrder && req.projectMeta?.estimatedCompletion && !isCompleted && (
                         <div className="text-right">
                             <div className="text-[10px] font-bold text-brand-brown/40 uppercase">Estimated Completion</div>
                             <div className="text-sm font-bold text-brand-orange flex items-center justify-end gap-1">
                                 <Clock className="w-3 h-3" />
-                                {new Date(req.projectMeta.estimatedCompletion).toLocaleDateString()}
+                                {req.projectMeta.estimatedCompletion?.toDate
+                                    ? req.projectMeta.estimatedCompletion.toDate().toLocaleDateString()
+                                    : new Date(req.projectMeta.estimatedCompletion).toLocaleDateString()}
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* TRACKING UI */}
-                {req.status === 'accepted' && (
+                {/* TRACKING UI (Recycling Requests Only) */}
+                {!isStoreOrder && req.status === 'accepted' && (
                     <div className="mb-6">
                         <div className="flex justify-between items-center relative">
                             {/* Line */}
@@ -87,29 +117,42 @@ function RequestCard({ req, onRate }) {
                     </div>
                 )}
 
-                {/* Financials or Rate Button */}
-                <div className="bg-brand-cream/30 rounded-xl p-4 text-sm flex justify-between items-center">
+                {/* Financials or Rate/Invoice Buttons */}
+                <div className="bg-brand-cream/30 rounded-xl p-4 text-sm flex justify-between items-center mt-2">
                     <div>
                         <span className="font-bold text-brand-brown/60 block text-xs uppercase">Total Cost</span>
                         <div className="font-bold text-brand-brown text-lg">
-                            ₹{req.finalQuote?.totalCustomerPrice || req.itemDetails?.conversionDetails?.estimated_conversion_cost_inr}
+                            ₹{req.finalQuote?.totalCustomerPrice || req.itemDetails?.conversionDetails?.estimated_conversion_cost_inr || req.price || 0}
                         </div>
                     </div>
 
-                    {isCompleted && !isRated && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onRate(); }}
-                            className="px-6 py-2 bg-brand-orange text-white font-bold rounded-lg hover:bg-brand-brown transition-colors shadow-lg animate-pulse"
-                        >
-                            Rate Vendor
-                        </button>
-                    )}
-                    {isRated && (
-                        <div className="flex items-center gap-1 text-yellow-500 font-bold bg-white px-3 py-1 rounded-lg">
-                            <Star className="w-4 h-4 fill-current" />
-                            {req.userRating}/5
-                        </div>
-                    )}
+                    <div className="flex gap-2 items-center">
+                        {isStoreOrder && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onInvoice(req); }}
+                                className="px-4 py-2 bg-gray-200 text-brand-brown font-bold rounded-lg hover:bg-gray-300 transition-colors text-xs flex items-center gap-1"
+                            >
+                                Invoice
+                            </button>
+                        )}
+
+                        {/* Rating for Service Requests */}
+                        {!isStoreOrder && isCompleted && !isRated && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onRate(); }}
+                                className="px-6 py-2 bg-brand-orange text-white font-bold rounded-lg hover:bg-brand-brown transition-colors shadow-lg animate-pulse"
+                            >
+                                Rate Vendor
+                            </button>
+                        )}
+
+                        {isRated && (
+                            <div className="flex items-center gap-1 text-yellow-500 font-bold bg-white px-3 py-1 rounded-lg">
+                                <Star className="w-4 h-4 fill-current" />
+                                {req.userRating}/5
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -118,85 +161,151 @@ function RequestCard({ req, onRate }) {
 
 export default function History() {
     const { currentUser } = useAuth();
-    const [history, setHistory] = useState([]);
-    const [requests, setRequests] = useState([]);
+    const navigate = useNavigate();
+
+    // Data States
+    const [rawRequests, setRawRequests] = useState([]);
+    const [rawOrders, setRawOrders] = useState([]);
+    const [history, setHistory] = useState([]); // Scans
     const [loading, setLoading] = useState(true);
+
+    // UI States
     const [activeTab, setActiveTab] = useState('requests'); // requests | scans
+    const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
 
     // Rating State
     const [ratingItem, setRatingItem] = useState(null);
     const [ratingScore, setRatingScore] = useState(5);
     const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
-    const navigate = useNavigate();
-
+    // Listeners
     useEffect(() => {
-        let unsubscribeRequests;
-        let unsubscribeHistory;
+        if (!currentUser) return;
+        setLoading(true);
 
-        async function setupListeners() {
-            if (!currentUser) return;
-            setLoading(true);
-            try {
-                // 1. Requests (Orders) Listener
-                const requestsRef = collection(db, "requests");
-                const requestsQ = query(
-                    requestsRef,
-                    where("customerId", "==", currentUser.uid)
-                );
+        // 1. Service Requests
+        const requestsRef = collection(db, "requests");
+        const requestsQ = query(requestsRef, where("customerId", "==", currentUser.uid));
+        const unsubRequests = onSnapshot(requestsQ, (snapshot) => {
+            const reqs = snapshot.docs.map(doc => ({ id: doc.id, type: 'request', ...doc.data() }));
+            setRawRequests(reqs);
+        }, (err) => console.error("Requests listener error:", err));
 
-                console.log("Setting up listener for requests for user:", currentUser.uid);
+        // 2. Store Orders (Using client-side sort to avoid index error)
+        const ordersRef = collection(db, "orders");
+        const ordersQ = query(ordersRef, where("customerId", "==", currentUser.uid));
+        const unsubOrders = onSnapshot(ordersQ, (snapshot) => {
+            const ords = snapshot.docs.map(doc => ({ id: doc.id, type: 'order', ...doc.data() }));
+            setRawOrders(ords);
+        }, (err) => console.error("Orders listener error:", err));
 
-                unsubscribeRequests = onSnapshot(requestsQ, (snapshot) => {
-                    console.log("Requests snapshot received, docs count:", snapshot.size);
-                    const loadedRequests = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-
-                    // Sort manually - robust date handling
-                    loadedRequests.sort((a, b) => {
-                        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-                        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-                        return dateB - dateA;
-                    });
-
-                    setRequests(loadedRequests);
-                }, (error) => {
-                    console.error("Error listening to requests:", error);
-                });
-
-                // 2. Scan History Listener
-                const historyRef = collection(db, "customers", currentUser.uid, "history");
-                const historyQ = query(historyRef, orderBy("timestamp", "desc"));
-
-                unsubscribeHistory = onSnapshot(historyQ, (snapshot) => {
-                    const loadedHistory = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                    setHistory(loadedHistory);
-                    setLoading(false); // Stop loading after initial data
-                }, (error) => {
-                    console.error("Error listening to history:", error);
-                    setLoading(false);
-                });
-
-            } catch (error) {
-                console.error("Error setting up listeners:", error);
-                setLoading(false);
-            }
-        }
-
-        setupListeners();
+        // 3. Scan History
+        const historyRef = collection(db, "customers", currentUser.uid, "history");
+        const historyQ = query(historyRef, orderBy("timestamp", "desc"));
+        const unsubHistory = onSnapshot(historyQ, (snapshot) => {
+            const hist = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setHistory(hist);
+            setLoading(false); // Assume initial load mostly done
+        }, (err) => {
+            console.error("History listener error:", err);
+            setLoading(false);
+        });
 
         return () => {
-            if (unsubscribeRequests) unsubscribeRequests();
-            if (unsubscribeHistory) unsubscribeHistory();
+            unsubRequests();
+            unsubOrders();
+            unsubHistory();
         };
     }, [currentUser]);
 
-    if (loading) {
+    // Merge & Sort Requests + Orders
+    const allActivityItems = useMemo(() => {
+        const combined = [...rawRequests, ...rawOrders];
+        return combined.sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt?.seconds * 1000 || 0);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt?.seconds * 1000 || 0);
+            return dateB - dateA;
+        });
+    }, [rawRequests, rawOrders]);
+
+    // Filter Active vs Past
+    const activeOrders = useMemo(() => {
+        return allActivityItems.filter(r => {
+            if (r.type === 'order') {
+                return r.status !== 'delivered' && r.status !== 'cancelled';
+            } else {
+                return r.status !== 'declined' && r.projectMeta?.trackingStage !== 'completed';
+            }
+        });
+    }, [allActivityItems]);
+
+    const pastOrders = useMemo(() => {
+        return allActivityItems.filter(r => {
+            if (r.type === 'order') {
+                return r.status === 'delivered' || r.status === 'cancelled';
+            } else {
+                return r.status === 'declined' || r.projectMeta?.trackingStage === 'completed';
+            }
+        });
+    }, [allActivityItems]);
+
+
+    // Handlers
+    const handleDelete = async (e, scanId, imageUrl) => {
+        e.stopPropagation();
+        if (!window.confirm("Are you sure you want to delete this scan?")) return;
+
+        try {
+            await deleteDoc(doc(db, "customers", currentUser.uid, "history", scanId));
+            if (imageUrl) {
+                try {
+                    const imageRef = ref(storage, imageUrl);
+                    await deleteObject(imageRef);
+                } catch (err) { console.warn("Image delete failed:", err); }
+            }
+            // State updates via snapshot automatically
+        } catch (error) {
+            console.error("Error deleting scan:", error);
+            alert("Failed to delete scan.");
+        }
+    };
+
+    const submitRating = async () => {
+        if (!ratingItem) return;
+        setRatingSubmitting(true);
+        try {
+            const requestRef = doc(db, 'requests', ratingItem.id);
+            await updateDoc(requestRef, {
+                userRating: ratingScore,
+                ratedAt: new Date()
+            });
+
+            // Update Vendor
+            if (ratingItem.acceptedBy) {
+                const vendorRef = doc(db, 'vendors', ratingItem.acceptedBy);
+                const vendorSnap = await getDoc(vendorRef);
+                if (vendorSnap.exists()) {
+                    const vData = vendorSnap.data();
+                    const currentRating = vData.rating || 5;
+                    const ratingCount = vData.ratingCount || 0;
+                    const newCount = ratingCount + 1;
+                    const newRating = ((currentRating * ratingCount) + ratingScore) / newCount;
+                    await updateDoc(vendorRef, { rating: newRating, ratingCount: newCount });
+                }
+            }
+
+            setRatingItem(null);
+            alert("Rating submitted!");
+        } catch (error) {
+            console.error("Rating Error:", error);
+            alert("Failed to submit rating.");
+        } finally {
+            setRatingSubmitting(false);
+        }
+    };
+
+
+    if (loading && allActivityItems.length === 0 && history.length === 0) {
         return (
             <div className="min-h-screen pt-24 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-brand-red" />
@@ -204,92 +313,13 @@ export default function History() {
         );
     }
 
-    const handleDelete = async (e, scanId, imageUrl) => {
-        e.stopPropagation(); // Prevent navigation
-        if (!window.confirm("Are you sure you want to delete this scan? This cannot be undone.")) return;
-
-        try {
-            // 1. Delete from Firestore
-            await deleteDoc(doc(db, "customers", currentUser.uid, "history", scanId));
-
-            // 2. Delete Image from Storage (if exists)
-            if (imageUrl) {
-                try {
-                    // Extract path from URL or create ref directly if you have the path.
-                    // Since we stored the download URL, we can try to create a ref from it.
-                    const imageRef = ref(storage, imageUrl);
-                    await deleteObject(imageRef);
-                } catch (storageErr) {
-                    console.warn("Could not delete image from storage (it might not exist or permission denied):", storageErr);
-                }
-            }
-
-            // 3. Update UI
-            setHistory(prev => prev.filter(item => item.id !== scanId));
-
-        } catch (error) {
-            console.error("Error deleting scan:", error);
-            alert("Failed to delete scan. Please try again.");
-        }
-    };
-    const submitRating = async () => {
-        if (!ratingItem) return;
-        setRatingSubmitting(true);
-        try {
-            // 1. Update Request with Rating
-            const requestRef = doc(db, 'requests', ratingItem.id);
-            await updateDoc(requestRef, {
-                userRating: ratingScore,
-                ratedAt: new Date()
-            });
-
-            // 2. Update Vendor's Average Rating
-            const vendorId = ratingItem.acceptedBy;
-            if (vendorId) {
-                const vendorRef = doc(db, 'vendors', vendorId);
-                const vendorSnap = await getDoc(vendorRef);
-
-                if (vendorSnap.exists()) {
-                    const vData = vendorSnap.data();
-                    const currentRating = vData.rating || 5; // Default 5
-                    const ratingCount = vData.ratingCount || 0; // Default 1 (the initial 5)
-
-                    // Calculate new average
-                    const newCount = ratingCount + 1;
-                    const newRating = ((currentRating * ratingCount) + ratingScore) / newCount;
-
-                    await updateDoc(vendorRef, {
-                        rating: newRating,
-                        ratingCount: newCount
-                    });
-                }
-            }
-
-            // 3. Update Local State
-            setRequests(prev => prev.map(r => r.id === ratingItem.id ? { ...r, userRating: ratingScore } : r));
-            setRatingItem(null);
-            alert("Thank you for your feedback!");
-
-        } catch (error) {
-            console.error("Error submitting rating:", error);
-            alert("Failed to submit rating.");
-        } finally {
-            setRatingSubmitting(false);
-        }
-    };
-
-    // Filter out completed items if needed, or sort active first
-    // User asked: "only things would be present which are not yet completed"
-    // I will Separate Active vs Past orders for better UX
-    const activeOrders = requests.filter(r => r.status !== 'declined' && r.projectMeta?.trackingStage !== 'completed');
-    const pastOrders = requests.filter(r => r.status === 'declined' || r.projectMeta?.trackingStage === 'completed');
     return (
         <div className="min-h-screen bg-brand-cream pt-24 pb-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-5xl mx-auto">
                 <div className="flex justify-between items-center mb-8">
                     <div>
                         <h1 className="text-3xl font-extrabold text-brand-brown">My Activity</h1>
-                        <p className="text-brand-brown/60 mt-2">Manage orders and view past scans.</p>
+                        <p className="text-brand-brown/60 mt-2">Manage orders, requests, and view scan history.</p>
                     </div>
                 </div>
 
@@ -300,7 +330,7 @@ export default function History() {
                         className={`pb-4 px-2 font-bold transition-colors relative ${activeTab === 'requests' ? 'text-brand-brown' : 'text-brand-brown/40 hover:text-brand-brown/60'
                             }`}
                     >
-                        My Requests
+                        My Orders & Requests
                         {activeTab === 'requests' && (
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-brown rounded-t-full" />
                         )}
@@ -319,45 +349,57 @@ export default function History() {
 
                 {/* Requests List */}
                 {activeTab === 'requests' && (
-                    <div className="space-y-8">
+                    <div className="space-y-8 animate-in fade-in">
                         {/* Active Orders Section */}
-                        <div>
-                            <h2 className="text-xl font-bold text-brand-brown mb-4 flex items-center gap-2">
-                                <Loader2 className="w-5 h-5 text-brand-orange animate-spin-slow" />
-                                Active Orders
-                            </h2>
-                            {activeOrders.length === 0 ? (
-                                <p className="text-brand-brown/40 italic">No active orders in progress.</p>
-                            ) : (
+                        {activeOrders.length > 0 && (
+                            <div>
+                                <h2 className="text-xl font-bold text-brand-brown mb-4 flex items-center gap-2">
+                                    <Loader2 className="w-5 h-5 text-brand-orange animate-spin-slow" />
+                                    Active Orders
+                                </h2>
                                 <div className="grid grid-cols-1 gap-6">
-                                    {activeOrders.map(req => <RequestCard key={req.id} req={req} onRate={() => setRatingItem(req)} />)}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Past Orders Section */}
-                        {pastOrders.length > 0 && (
-                            <div className="pt-8 border-t border-brand-brown/10">
-                                <h2 className="text-xl font-bold text-brand-brown mb-4 opacity-70">Past Orders</h2>
-                                <div className="grid grid-cols-1 gap-6 opacity-80 hover:opacity-100 transition-opacity">
-                                    {pastOrders.map(req => <RequestCard key={req.id} req={req} onRate={() => setRatingItem(req)} />)}
+                                    {activeOrders.map(req => (
+                                        <RequestCard
+                                            key={req.id}
+                                            req={req}
+                                            onRate={() => setRatingItem(req)}
+                                            onInvoice={setSelectedInvoiceOrder}
+                                        />
+                                    ))}
                                 </div>
                             </div>
                         )}
 
-                        {requests.length === 0 && (
+                        {/* Past Orders Section */}
+                        {pastOrders.length > 0 && (
+                            <div className={`${activeOrders.length > 0 ? 'pt-8 border-t border-brand-brown/10' : ''}`}>
+                                <h2 className="text-xl font-bold text-brand-brown mb-4 opacity-70">Past Orders / Completed</h2>
+                                <div className="grid grid-cols-1 gap-6 opacity-80 hover:opacity-100 transition-opacity">
+                                    {pastOrders.map(req => (
+                                        <RequestCard
+                                            key={req.id}
+                                            req={req}
+                                            onRate={() => setRatingItem(req)}
+                                            onInvoice={setSelectedInvoiceOrder}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {allActivityItems.length === 0 && (
                             <div className="text-center py-20 bg-white rounded-3xl border border-brand-brown/10">
                                 <PackageOpen className="w-16 h-16 text-brand-brown/20 mx-auto mb-4" />
-                                <h3 className="text-xl font-bold text-brand-brown">No requests yet</h3>
-                                <p className="text-brand-brown/60">Requests sent to vendors will appear here.</p>
+                                <h3 className="text-xl font-bold text-brand-brown">No activity yet</h3>
+                                <p className="text-brand-brown/60">Your orders and requests will appear here.</p>
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* Scans List (Existing) */}
+                {/* Scans List */}
                 {activeTab === 'scans' && (
-                    <>
+                    <div className="animate-in fade-in">
                         {history.length === 0 ? (
                             <div className="text-center py-20 bg-white rounded-3xl border border-brand-brown/10 shadow-sm">
                                 <div className="w-20 h-20 bg-brand-cream rounded-full flex items-center justify-center mx-auto text-brand-brown/40 mb-4">
@@ -419,9 +461,18 @@ export default function History() {
                                 ))}
                             </div>
                         )}
-                    </>
+                    </div>
                 )}
             </div>
+
+            {/* Invoice Modal */}
+            {selectedInvoiceOrder && (
+                <InvoiceModal
+                    order={selectedInvoiceOrder}
+                    onClose={() => setSelectedInvoiceOrder(null)}
+                />
+            )}
+
             {/* Rating Modal */}
             {ratingItem && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in">
@@ -462,5 +513,3 @@ export default function History() {
         </div>
     );
 }
-
-

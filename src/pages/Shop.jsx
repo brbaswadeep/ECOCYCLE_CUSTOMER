@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, Search, Filter, Star, Plus, Check, X, Tag, Package, Recycle, Minus, Trash2, History } from 'lucide-react';
 import ecoshopLogo from '../assets/Ecoshop.png';
+import InvoiceModal from '../components/InvoiceModal';
 import { db } from '../firebase';
-import { collection, query, orderBy, getDocs, addDoc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, serverTimestamp, where, doc, updateDoc, increment, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const CATEGORIES = ["All", "General", "Gardening", "Kitchen", "Accessories", "Outdoor", "Decor", "Furniture"];
 
@@ -14,7 +16,8 @@ export default function Shop() {
     const [showBuyModal, setShowBuyModal] = useState(false);
     const [isPurchasing, setIsPurchasing] = useState(false);
 
-    const { currentUser } = useAuth(); // Moved to top
+    const { currentUser } = useAuth();
+    const navigate = useNavigate();
 
     // Cart State
     const [cart, setCart] = useState([]);
@@ -23,6 +26,9 @@ export default function Shop() {
     // Orders State
     const [orders, setOrders] = useState([]);
     const [showOrders, setShowOrders] = useState(false);
+
+    // Invoice State
+    const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState(null);
 
     // Load Cart from LocalStorage
     useEffect(() => {
@@ -43,18 +49,23 @@ export default function Shop() {
         try {
             const q = query(
                 collection(db, "orders"),
-                where("customerId", "==", currentUser.uid),
-                orderBy("createdAt", "desc")
+                where("customerId", "==", currentUser.uid)
             );
             const snapshot = await getDocs(q);
             const fetchedOrders = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
-            }));
+            })).sort((a, b) => {
+                const timeA = a.createdAt?.seconds || (a.createdAt?.toMillis ? a.createdAt.toMillis() / 1000 : 0);
+                const timeB = b.createdAt?.seconds || (b.createdAt?.toMillis ? b.createdAt.toMillis() / 1000 : 0);
+                return timeB - timeA;
+            });
+
             setOrders(fetchedOrders);
             setShowOrders(true);
         } catch (error) {
             console.error("Error fetching orders:", error);
+            alert("Failed to load orders.");
         }
     };
 
@@ -69,7 +80,6 @@ export default function Shop() {
             }
             return [...prev, { ...product, quantity: 1 }];
         });
-        // alert("Added to cart!"); // Optional feedback
     };
 
     const removeFromCart = (productId) => {
@@ -86,7 +96,28 @@ export default function Shop() {
         }));
     };
 
-    const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const calculateBill = (items) => {
+        const subtotal = items.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
+        const gst = subtotal * 0.18;
+        const deliveryFee = subtotal > 0 ? (40 + Math.floor(Math.random() * 50)) : 0;
+        const total = subtotal + gst + deliveryFee;
+        return { subtotal, gst, deliveryFee, total };
+    };
+
+    const cartBill = calculateBill(cart);
+
+    // Delete Order
+    const handleDeleteOrder = async (e, orderId) => {
+        e.stopPropagation();
+        if (!confirm("Are you sure you want to delete this order from history?")) return;
+        try {
+            await deleteDoc(doc(db, "orders", orderId));
+            setOrders(prev => prev.filter(o => o.id !== orderId));
+        } catch (error) {
+            console.error("Error deleting order:", error);
+            alert("Failed to delete order");
+        }
+    };
 
     const checkOut = async () => {
         if (!currentUser) {
@@ -96,6 +127,19 @@ export default function Shop() {
         setIsPurchasing(true);
         try {
             for (const item of cart) {
+                // Check stock (optimistic)
+                if (item.quantity > (item.availableQty || 999)) {
+                    alert(`Not enough stock for ${item.name}`);
+                    continue;
+                }
+
+                const itemBill = calculateBill([item]);
+
+                // Finance Calculations
+                const productValue = item.price * item.quantity;
+                const platformFee = productValue * 0.015;
+                const vendorEarnings = itemBill.total - platformFee;
+
                 await addDoc(collection(db, "orders"), {
                     customerId: currentUser.uid,
                     customerName: currentUser.displayName || "Customer",
@@ -105,16 +149,31 @@ export default function Shop() {
                     productId: item.id,
                     productName: item.name,
                     productImage: item.image,
-                    price: item.price * item.quantity,
+                    price: itemBill.total,
+                    priceBreakdown: {
+                        subtotal: productValue,
+                        gst: Math.round(itemBill.gst),
+                        deliveryFee: itemBill.deliveryFee,
+                        total: itemBill.total,
+                        platformFee: platformFee,
+                        vendorEarnings: vendorEarnings
+                    },
                     quantity: item.quantity,
                     status: 'pending',
                     createdAt: serverTimestamp()
+                });
+
+                // Decrement Inventory
+                const productRef = doc(db, "products", item.id);
+                await updateDoc(productRef, {
+                    quantity: increment(-item.quantity)
                 });
             }
             setCart([]);
             setIsPurchasing(false);
             setIsCartOpen(false);
             alert("Order placed successfully!");
+            fetchProducts();
         } catch (error) {
             console.error("Checkout error:", error);
             alert("Checkout failed.");
@@ -131,13 +190,20 @@ export default function Shop() {
 
     const fetchProducts = async () => {
         try {
-            const q = query(collection(db, "products"), orderBy("createdAt", "desc"));
+            const q = query(collection(db, "products"));
             const snapshot = await getDocs(q);
             const fetchedProducts = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
-            }));
-            setProducts(fetchedProducts);
+            })).sort((a, b) => {
+                const timeA = a.createdAt?.seconds || (a.createdAt?.toMillis ? a.createdAt.toMillis() / 1000 : 0);
+                const timeB = b.createdAt?.seconds || (b.createdAt?.toMillis ? b.createdAt.toMillis() / 1000 : 0);
+                return timeB - timeA;
+            });
+
+            const availableProducts = fetchedProducts.filter(p => p.quantity && p.quantity > 0);
+
+            setProducts(availableProducts);
             setLoading(false);
         } catch (error) {
             console.error("Error fetching products:", error);
@@ -151,10 +217,6 @@ export default function Shop() {
         return matchesCategory && matchesSearch;
     });
 
-    // ... (keep existing code) ...
-
-    // ... (keep existing code) ...
-
     const handleBuy = async () => {
         if (!currentUser) {
             alert("Please login to purchase items.");
@@ -163,7 +225,13 @@ export default function Shop() {
 
         setIsPurchasing(true);
         try {
-            // Create Order in Firestore
+            const qty = 1;
+            const bill = calculateBill([{ ...selectedProduct, quantity: qty }]);
+
+            const productValue = selectedProduct.price * qty;
+            const platformFee = productValue * 0.015;
+            const vendorEarnings = bill.total - platformFee;
+
             await addDoc(collection(db, "orders"), {
                 customerId: currentUser.uid,
                 customerName: currentUser.displayName || "Customer",
@@ -173,15 +241,30 @@ export default function Shop() {
                 productId: selectedProduct.id,
                 productName: selectedProduct.name,
                 productImage: selectedProduct.image,
-                price: selectedProduct.price,
-                status: 'pending', // pending, completed, cancelled
+                price: bill.total,
+                priceBreakdown: {
+                    subtotal: productValue,
+                    gst: Math.round(bill.gst),
+                    deliveryFee: bill.deliveryFee,
+                    total: bill.total,
+                    platformFee: platformFee,
+                    vendorEarnings: vendorEarnings
+                },
+                quantity: qty,
+                status: 'pending',
                 createdAt: serverTimestamp()
+            });
+
+            const productRef = doc(db, "products", selectedProduct.id);
+            await updateDoc(productRef, {
+                quantity: increment(-qty)
             });
 
             setIsPurchasing(false);
             setShowBuyModal(false);
             setSelectedProduct(null);
-            alert("Thank you for your purchase! Your order has been sent to the vendor.");
+            alert("Thank you for your purchase!");
+            fetchProducts();
         } catch (error) {
             console.error("Error creating order:", error);
             alert("Failed to place order. Please try again.");
@@ -411,16 +494,41 @@ export default function Shop() {
             )}
 
             {/* Purchase Confirmation Modal */}
-            {showBuyModal && (
+            {showBuyModal && selectedProduct && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl transform transition-all scale-100">
+                    <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl transform transition-all scale-100">
                         <div className="w-16 h-16 bg-brand-cream rounded-full flex items-center justify-center mx-auto mb-4">
                             <ShoppingBag className="w-8 h-8 text-brand-brown" />
                         </div>
-                        <h3 className="text-xl font-bold text-brand-black mb-2">Confirm Purchase</h3>
-                        <p className="text-gray-500 mb-6">
-                            Are you sure you want to buy <span className="font-bold text-brand-brown">{selectedProduct?.name}</span> for ₹{selectedProduct?.price}?
+                        <h3 className="text-xl font-bold text-brand-black mb-2 text-center">Confirm Purchase</h3>
+                        <p className="text-gray-500 mb-6 text-center">
+                            Are you sure you want to buy <span className="font-bold text-brand-brown">{selectedProduct.name}</span>?
                         </p>
+
+                        {/* Bill Breakdown for Single Item */}
+                        {(() => {
+                            const bill = calculateBill([{ ...selectedProduct, quantity: 1 }]);
+                            return (
+                                <div className="bg-gray-50 p-4 rounded-xl mb-6 space-y-2 text-sm">
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Subtotal</span>
+                                        <span>₹{bill.subtotal}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>GST (18%)</span>
+                                        <span>₹{Math.round(bill.gst)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-600">
+                                        <span>Delivery Fee</span>
+                                        <span>₹{bill.deliveryFee}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold text-brand-brown border-t pt-2 mt-2">
+                                        <span>Total</span>
+                                        <span>₹{bill.total}</span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         <div className="flex gap-3">
                             <button
@@ -492,9 +600,23 @@ export default function Shop() {
 
                             {cart.length > 0 && (
                                 <div className="p-6 border-t bg-gray-50">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <span className="text-gray-500 font-medium">Total Amount</span>
-                                        <span className="text-2xl font-extrabold text-brand-brown">₹{cartTotal}</span>
+                                    <div className="space-y-2 mb-4 text-sm">
+                                        <div className="flex justify-between text-gray-500">
+                                            <span>Subtotal</span>
+                                            <span>₹{cartBill.subtotal}</span>
+                                        </div>
+                                        <div className="flex justify-between text-gray-500">
+                                            <span>GST (18%)</span>
+                                            <span>₹{Math.round(cartBill.gst)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-gray-500">
+                                            <span>Delivery Fee</span>
+                                            <span>₹{cartBill.deliveryFee}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center mb-6 pt-4 border-t border-dashed border-gray-200">
+                                        <span className="text-lg font-bold text-brand-brown">Total Amount</span>
+                                        <span className="text-2xl font-extrabold text-brand-green">₹{cartBill.total}</span>
                                     </div>
                                     <button
                                         onClick={checkOut}
@@ -531,7 +653,10 @@ export default function Shop() {
                                     </div>
                                 ) : (
                                     orders.map(order => (
-                                        <div key={order.id} className="border border-brand-brown/10 rounded-xl p-4 flex gap-4 hover:bg-gray-50 transition">
+                                        <div key={order.id}
+                                            className="border border-brand-brown/10 rounded-xl p-4 flex gap-4 hover:bg-gray-50 transition cursor-pointer"
+                                            onClick={() => navigate(`/store-orders/${order.id}`)}
+                                        >
                                             <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                                                 <img src={order.productImage || 'https://placehold.co/100'} alt="Product" className="w-full h-full object-cover" />
                                             </div>
@@ -545,7 +670,25 @@ export default function Shop() {
                                                 <p className="text-xs text-gray-500 mb-2">Order ID: #{order.id.slice(0, 8)}</p>
                                                 <div className="flex justify-between items-center text-sm">
                                                     <span className="font-bold text-brand-green">₹{order.price}</span>
-                                                    <span className="text-gray-400 text-xs">{new Date(order.createdAt?.toMillis()).toLocaleDateString()}</span>
+                                                    <div className="flex gap-2 items-center">
+                                                        <span className="text-gray-400 text-xs">{new Date(order.createdAt?.seconds * 1000).toLocaleDateString()}</span>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedInvoiceOrder(order);
+                                                            }}
+                                                            className="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded hover:bg-brand-brown hover:text-white transition"
+                                                        >
+                                                            Invoice
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => handleDeleteOrder(e, order.id)}
+                                                            className="text-gray-400 hover:text-red-500 transition"
+                                                            title="Delete History"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -554,8 +697,15 @@ export default function Shop() {
                             </div>
                         </div>
                     </div>
-                )
-            }
+                )}
+
+            {/* Invoice Modal */}
+            {selectedInvoiceOrder && (
+                <InvoiceModal
+                    order={selectedInvoiceOrder}
+                    onClose={() => setSelectedInvoiceOrder(null)}
+                />
+            )}
         </>
     );
 }
