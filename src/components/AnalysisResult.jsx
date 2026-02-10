@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, DollarSign, Recycle, Store } from 'lucide-react';
+import { Leaf, DollarSign, Recycle, Store, Sparkles } from 'lucide-react';
 import ProductCard from './ProductCard';
 import RequestConfirmation from './RequestConfirmation';
 
@@ -200,6 +200,10 @@ export default function AnalysisResult({ result, image, imageUrl, onReset, onDon
                                 />
                             ))}
                         </div>
+                        <div className="mt-4 pt-4 border-t border-brand-brown/10 flex items-center justify-end gap-2 text-brand-brown/40 text-xs font-medium">
+                            <Sparkles className="w-3 h-3" />
+                            <span>Ideas powered by OPENAI</span>
+                        </div>
                     </AnalysisCard>
                 </div>
             </div>
@@ -223,7 +227,8 @@ export default function AnalysisResult({ result, image, imageUrl, onReset, onDon
                         </button>
                     )}
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 }

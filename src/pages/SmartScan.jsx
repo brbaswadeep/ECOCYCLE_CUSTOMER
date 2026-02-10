@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { generateIdeasFromText } from '../services/gemini';
+import { generateIdeasFromTextOpenAI } from '../services/openai'; // Changed import
 import { analyzeImageWithNvidia } from '../services/nvidia';
 import { Upload, Camera, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +13,7 @@ export default function SmartScan() {
     const [image, setImage] = useState(null);
     const [preview, setPreview] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
-    const [statusText, setStatusText] = useState('Analyzing...'); // New state for granular feedback
+    const [statusText, setStatusText] = useState('Analyzing...');
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
     const navigate = useNavigate();
@@ -42,7 +42,7 @@ export default function SmartScan() {
         reader.readAsDataURL(file);
     };
 
-    const [uploadedImageUrl, setUploadedImageUrl] = useState(null); // Store uploaded URL
+    const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
 
     const saveAnalysis = async (analysisData, imageUrl) => {
         if (!currentUser) return null;
@@ -50,22 +50,19 @@ export default function SmartScan() {
         let downloadURL = null;
 
         try {
-            // Upload image to Firebase Storage
             const timestamp = Date.now();
             const storageRef = ref(storage, `scans/${currentUser.uid}/${timestamp}.jpg`);
             await uploadString(storageRef, imageUrl, 'data_url');
             downloadURL = await getDownloadURL(storageRef);
         } catch (uploadError) {
             console.error("Image upload failed (CORS or Network issue):", uploadError);
-            // Continue saving the rest of the data even if image upload fails
         }
 
         try {
-            // Save analysis to Firestore
             const historyRef = doc(collection(db, "customers", currentUser.uid, "history"));
             const analysisToSave = {
                 ...analysisData,
-                imageUrl: downloadURL, // Will be null if upload failed
+                imageUrl: downloadURL,
                 timestamp: serverTimestamp(),
                 userId: currentUser.uid,
                 summary: {
@@ -79,7 +76,6 @@ export default function SmartScan() {
             console.log("Analysis saved successfully!", historyRef.id);
 
             if (!downloadURL) {
-                // Inform user about partial success
                 alert("Analysis saved! (Image could not be saved due to network restrictions)");
             }
             return downloadURL;
@@ -102,9 +98,13 @@ export default function SmartScan() {
             const nvidiaAnalysis = await analyzeImageWithNvidia(image);
             console.log("NVIDIA Result:", nvidiaAnalysis);
 
-            // Step 2: Gemini Ideas
-            setStatusText('Generating Ideas (Gemini)...');
-            const data = await generateIdeasFromText(nvidiaAnalysis);
+            if (!nvidiaAnalysis || typeof nvidiaAnalysis !== 'string') {
+                throw new Error("Failed to identify item with NVIDIA.");
+            }
+
+            // Step 2: OpenAI Ideas
+            setStatusText('Generating Ideas (OpenAI)...');
+            const data = await generateIdeasFromTextOpenAI(nvidiaAnalysis);
 
             setResult(data);
             const url = await saveAnalysis(data, image);

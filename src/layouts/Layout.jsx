@@ -4,6 +4,7 @@ import { LogIn, User, LayoutDashboard, History, MapPin, Scan, Menu, X, LogOut, L
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/logo.png';
 import LocationRequiredPopup from '../components/LocationRequiredPopup';
+import EcoBot from '../components/EcoBot';
 
 export default function Layout() {
     const { currentUser } = useAuth();
@@ -18,6 +19,7 @@ export default function Layout() {
     return (
         <div className="flex h-screen bg-brand-cream overflow-hidden font-sans">
             <LocationRequiredPopup />
+            <EcoBot />
 
             {/* Sidebar (Desktop) */}
             <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-brand-brown/10 h-full fixed left-0 top-0 z-50">

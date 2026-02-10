@@ -1,7 +1,31 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = "AIzaSyC7D6oj9_6DMOgDFmc1TRok9lGUWsUitBg"; // Key from .env
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function getEnvVar(key) {
+    try {
+        const envPath = path.resolve(__dirname, '.env');
+        const envFile = fs.readFileSync(envPath, 'utf8');
+        const match = envFile.match(new RegExp(`^${key}=(.*)$`, 'm'));
+        return match ? match[1].trim() : null;
+    } catch (e) {
+        console.error("Error reading .env file:", e);
+        return null;
+    }
+}
+
+const API_KEY = getEnvVar('VITE_GEMINI_API_KEY');
+
+if (!API_KEY) {
+    console.error("Error: VITE_GEMINI_API_KEY not found in .env file");
+    process.exit(1);
+}
+
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
