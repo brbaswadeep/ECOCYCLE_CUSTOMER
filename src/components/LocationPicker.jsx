@@ -82,13 +82,23 @@ function LocationPickerContent({
                 const handleLocationUpdate = async (latLng) => {
                     if (!latLng) return;
 
-                    const lat = typeof latLng.lat === 'function' ? latLng.lat() : latLng.lat;
-                    const lng = typeof latLng.lng === 'function' ? latLng.lng() : latLng.lng;
+                    let lat, lng;
+                    if (typeof latLng.lat === 'function') {
+                        lat = latLng.lat();
+                        lng = latLng.lng();
+                    } else {
+                        lat = latLng.lat;
+                        lng = latLng.lng;
+                    }
+
+                    // Normalize to numbers
+                    lat = Number(lat);
+                    lng = Number(lng);
 
                     // Geocode to get address - ensuring robust save
                     try {
                         const response = await geocoder.geocode({ location: { lat, lng } });
-                        if (response.results[0]) {
+                        if (response.results && response.results.length > 0) {
                             const address = response.results[0].formatted_address;
                             if (onLocationSelect) {
                                 onLocationSelect({
@@ -101,9 +111,10 @@ function LocationPickerContent({
                             }
                         } else {
                             // Fallback
+                            const fallbackAddr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
                             if (onLocationSelect) {
                                 onLocationSelect({
-                                    address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+                                    address: fallbackAddr,
                                     coordinates: { lat, lng },
                                     lat,
                                     lng
@@ -126,11 +137,13 @@ function LocationPickerContent({
 
                 // Handle marker drag - Use addEventListener for AdvancedMarkerElement
                 if (!readOnly) {
+                    // Note: 'dragend' event on AdvancedMarkerElement is standard
                     marker.addEventListener('dragend', async () => {
+                        // For AdvancedMarkerElement, position property updates automatically
                         await handleLocationUpdate(marker.position);
                     });
 
-                    // Map still uses addListener (it is a google.maps.Map)
+                    // Map click listener
                     initializedMap.addListener('click', async (e) => {
                         if (e.latLng) {
                             marker.position = e.latLng;
@@ -145,20 +158,21 @@ function LocationPickerContent({
                         const place = pickerRef.current.place;
                         if (place && place.location) {
                             const location = place.location;
+                            const lat = location.lat();
+                            const lng = location.lng();
+
                             initializedMap.setCenter(location);
                             initializedMap.setZoom(17);
                             marker.position = location;
 
+                            // We can use the place address directly as it's likely more accurate than reverse geocoding the coord immediately
                             if (onLocationSelect) {
                                 onLocationSelect({
-                                    lat: location.lat(),
-                                    lng: location.lng(),
-                                    address: place.formattedAddress,
+                                    address: place.formattedAddress, // Use authoritative address from picker
                                     name: place.displayName,
-                                    coordinates: {
-                                        lat: location.lat(),
-                                        lng: location.lng()
-                                    }
+                                    coordinates: { lat, lng },
+                                    lat,
+                                    lng
                                 });
                             }
                         }
