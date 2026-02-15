@@ -74,11 +74,15 @@ export default function Shop() {
         setCart(prev => {
             const existing = prev.find(item => item.id === product.id);
             if (existing) {
+                if (existing.quantity >= (existing.maxStock || product.quantity)) {
+                    alert(`Only ${existing.maxStock || product.quantity} items available in stock!`);
+                    return prev;
+                }
                 return prev.map(item =>
                     item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
                 );
             }
-            return [...prev, { ...product, quantity: 1 }];
+            return [...prev, { ...product, maxStock: product.quantity, quantity: 1 }];
         });
     };
 
@@ -89,8 +93,12 @@ export default function Shop() {
     const updateQuantity = (productId, change) => {
         setCart(prev => prev.map(item => {
             if (item.id === productId) {
-                const newQuantity = Math.max(1, item.quantity + change);
-                return { ...item, quantity: newQuantity };
+                const newQuantity = item.quantity + change;
+                if (change > 0 && newQuantity > (item.maxStock || 999)) {
+                    alert(`Only ${item.maxStock} items available in stock!`);
+                    return item;
+                }
+                return { ...item, quantity: Math.max(1, newQuantity) };
             }
             return item;
         }));
@@ -128,7 +136,7 @@ export default function Shop() {
         try {
             for (const item of cart) {
                 // Check stock (optimistic)
-                if (item.quantity > (item.availableQty || 999)) {
+                if (item.quantity > (item.maxStock || 999)) {
                     alert(`Not enough stock for ${item.name}`);
                     continue;
                 }

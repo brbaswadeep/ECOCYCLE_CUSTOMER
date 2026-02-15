@@ -14,26 +14,56 @@ export default function EcoBot() {
     const messagesEndRef = useRef(null);
     const { currentUser } = useAuth();
 
-    // Auto-scroll to bottom of chat
+    const [isTawkReady, setIsTawkReady] = useState(false);
+
     useEffect(() => {
-        if (mode === 'bot') {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-    }, [messages, mode, isOpen]);
+        const checkTawk = setInterval(() => {
+            if (window.Tawk_API) {
+                setIsTawkReady(true);
+                clearInterval(checkTawk);
+
+                window.Tawk_API.onChatMaximized = function () {
+                    setMode('support');
+                    if (!isOpen) setIsOpen(true);
+                };
+
+                window.Tawk_API.onChatMinimized = function () {
+                    setMode('menu');
+                };
+
+                window.Tawk_API.onChatHidden = function () {
+                    setMode('menu');
+                };
+            }
+        }, 1000);
+
+        return () => clearInterval(checkTawk);
+    }, [isOpen]);
 
     const toggleOpen = () => {
         setIsOpen(!isOpen);
-        if (!isOpen) setMode('menu'); // Reset to menu when opening
+        if (!isOpen) {
+            setMode('menu');
+            if (window.Tawk_API) window.Tawk_API.minimize();
+        }
     };
 
     const handleOpenTawk = () => {
         if (window.Tawk_API) {
+            setMode('support');
             window.Tawk_API.showWidget();
             window.Tawk_API.maximize();
-            setIsOpen(false);
         } else {
             alert("Support chat is initializing. Please try again in a moment.");
         }
+    };
+
+    const handleBackToMenu = () => {
+        if (window.Tawk_API) {
+            window.Tawk_API.minimize();
+            // window.Tawk_API.hideWidget(); // Optional: hide if you want it gone completely
+        }
+        setMode('menu');
     };
 
     const handleSendMessage = async (e) => {
@@ -81,7 +111,10 @@ export default function EcoBot() {
                                 {mode === 'bot' ? <Bot className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
                             </div>
                             <div className="text-center">
-                                <h3 className="font-bold text-sm">{mode === 'bot' ? 'EcoBot Assistant' : 'EcoCycle Support'}</h3>
+                                <h3 className="font-bold text-sm">
+                                    {mode === 'bot' ? 'EcoBot Assistant' :
+                                        mode === 'support' ? 'Support Status' : 'EcoCycle Support'}
+                                </h3>
                                 <p className="text-[10px] opacity-70">Always here to help</p>
                             </div>
                         </div>
@@ -171,6 +204,27 @@ export default function EcoBot() {
                                     {isTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 pl-0.5" />}
                                 </button>
                             </form>
+                        </div>
+                    )}
+                    {/* Content: Support Mode */}
+                    {mode === 'support' && (
+                        <div className="p-6 text-center space-y-4">
+                            <div className="w-16 h-16 bg-brand-brown/10 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                                <Users className="w-8 h-8 text-brand-brown" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg text-brand-brown">Support Chat Active</h3>
+                                <p className="text-sm text-brand-brown/60">
+                                    The support window is open. You can chat with our team there.
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleBackToMenu}
+                                className="px-6 py-2 bg-brand-brown text-white rounded-xl font-bold hover:bg-brand-black transition-colors shadow-lg flex items-center justify-center gap-2 mx-auto"
+                            >
+                                <ChevronRight className="w-4 h-4 rotate-180" />
+                                Back to Menu
+                            </button>
                         </div>
                     )}
                 </div>
