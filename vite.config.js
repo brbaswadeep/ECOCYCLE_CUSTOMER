@@ -23,6 +23,16 @@ export default defineConfig(({ mode }) => {
             });
           },
         },
+        '/api/generateIdeas': {
+          target: 'https://api.openai.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/generateIdeas/, '/v1/chat/completions'),
+          configure: (proxy, options) => {
+            proxy.on('proxyReq', (proxyReq, req, res) => {
+              proxyReq.setHeader('Authorization', `Bearer ${env.VITE_OPENAI_API_KEY}`);
+            });
+          },
+        },
       },
     },
   }

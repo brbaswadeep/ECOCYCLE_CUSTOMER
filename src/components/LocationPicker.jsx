@@ -43,47 +43,13 @@ function LocationPickerContent({
         if (!mapRef.current) return;
 
         const initMap = async () => {
-            // Dynamic loader for Google Maps
-            const loadGoogleMaps = () => {
-                return new Promise((resolve, reject) => {
-                    if (window.google && window.google.maps) {
-                        resolve(window.google.maps);
-                        return;
-                    }
-
-                    if (document.getElementById('google-maps-script')) {
-                        // Already loading
-                        const checkInterval = setInterval(() => {
-                            if (window.google && window.google.maps) {
-                                clearInterval(checkInterval);
-                                resolve(window.google.maps);
-                            }
-                        }, 100);
-                        return;
-                    }
-
-                    const script = document.createElement('script');
-                    script.id = 'google-maps-script';
-                    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-                    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker,geocoding&loading=async`;
-                    script.async = true;
-                    script.defer = true;
-
-                    script.onload = () => {
-                        if (window.google && window.google.maps) {
-                            resolve(window.google.maps);
-                        } else {
-                            reject(new Error("Google Maps loaded but window.google.maps is undefined"));
-                        }
-                    };
-
-                    script.onerror = (err) => reject(err);
-                    document.head.appendChild(script);
-                });
-            };
+            // Check if google maps is loaded
+            if (!window.google || !window.google.maps) {
+                console.warn("Google Maps API not loaded");
+                return;
+            }
 
             try {
-                await loadGoogleMaps();
                 const { Map } = await window.google.maps.importLibrary("maps");
                 const { AdvancedMarkerElement } = await window.google.maps.importLibrary("marker");
                 const { Geocoder } = await window.google.maps.importLibrary("geocoding");
