@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { generateIdeasFromTextOpenAI } from '../services/openai'; // Changed import
+import { generateIdeasFromTextOpenAI } from '../services/openai';
+import { generateIdeasFromText } from '../services/gemini'; // Import Gemini service fallback
 import { analyzeImageWithNvidia } from '../services/nvidia';
 import { Upload, Camera, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AnalysisResult from '../components/AnalysisResult';
+import RestrictionPopup from '../components/RestrictionPopup';
 import { useAuth } from '../context/AuthContext';
 import { db, storage } from '../firebase';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
@@ -16,6 +18,12 @@ export default function SmartScan() {
     const [statusText, setStatusText] = useState('Analyzing...');
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
+
+    // Restriction State
+    const [showRestriction, setShowRestriction] = useState(false);
+    const [restrictionCategory, setRestrictionCategory] = useState(null);
+    const [restrictionReason, setRestrictionReason] = useState(null);
+
     const navigate = useNavigate();
     const { currentUser } = useAuth();
 
@@ -95,16 +103,59 @@ export default function SmartScan() {
         try {
             // Step 1: NVIDIA Analysis
             console.log("Starting NVIDIA Analysis...");
-            const nvidiaAnalysis = await analyzeImageWithNvidia(image);
-            console.log("NVIDIA Result:", nvidiaAnalysis);
+            const nvidiaResponse = await analyzeImageWithNvidia(image);
+            console.log("NVIDIA Result:", nvidiaResponse);
 
-            if (!nvidiaAnalysis || typeof nvidiaAnalysis !== 'string') {
+            let analysisText = nvidiaResponse;
+
+            // Attempt to parse JSON response from NVIDIA
+            try {
+                // Sanitize response in case of markdown code blocks
+                const cleanResponse = nvidiaResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+                const jsonResponse = JSON.parse(cleanResponse);
+
+                if (jsonResponse.valid === false) {
+                    setRestrictionCategory(jsonResponse.refusal_category);
+                    setRestrictionReason(jsonResponse.refusal_reason);
+                    setShowRestriction(true);
+                    setAnalyzing(false);
+                    setStatusText('Analyzing...');
+                    return; // STOP: Do not proceed to OpenAI
+                }
+
+                // If valid, use the analysis text from JSON
+                if (jsonResponse.analysis) {
+                    analysisText = jsonResponse.analysis;
+                }
+            } catch (e) {
+                console.warn("NVIDIA response was not valid JSON, treating as raw text fallback:", e);
+                // Fallback: Use raw response if parsing fails (legacy compatibility)
+                analysisText = nvidiaResponse;
+            }
+
+            if (!analysisText || typeof analysisText !== 'string') {
                 throw new Error("Failed to identify item with NVIDIA.");
             }
 
-            // Step 2: OpenAI Ideas
+            // Step 2: OpenAI Ideas (with Gemini Fallback)
             setStatusText('Generating Ideas (OpenAI)...');
-            const data = await generateIdeasFromTextOpenAI(nvidiaAnalysis);
+            let data;
+
+            try {
+                // Primary: Try OpenAI
+                data = await generateIdeasFromTextOpenAI(analysisText);
+            } catch (openaiError) {
+                console.warn("OpenAI Failed, switching to Gemini Fallback:", openaiError);
+                setStatusText('OpenAI Busy. Switching to Gemini...');
+
+                try {
+                    // Fallback: Try Gemini
+                    data = await generateIdeasFromText(analysisText);
+                } catch (geminiError) {
+                    console.error("Gemini Fallback also failed:", geminiError);
+                    throw new Error("Both AI services failed to generate ideas. Please try again later.");
+                }
+            }
 
             setResult(data);
             const url = await saveAnalysis(data, image);
@@ -215,6 +266,19 @@ export default function SmartScan() {
                     />
                 )}
             </div>
+
+            {/* Restriction Popup */}
+            <RestrictionPopup
+                isOpen={showRestriction}
+                onClose={() => {
+                    setShowRestriction(false);
+                    setImage(null);
+                    setPreview(null);
+                    setResult(null);
+                }}
+                refusalCategory={restrictionCategory}
+                refusalReason={restrictionReason}
+            />
         </div>
     );
 }

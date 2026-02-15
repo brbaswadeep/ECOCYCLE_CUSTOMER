@@ -1,14 +1,36 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY; // User provided key
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
-  generationConfig: {
-    maxOutputTokens: 8192,
-    temperature: 0.7,
+const API_KEYS = [
+  import.meta.env.VITE_GEMINI_API_KEY,
+  import.meta.env.VITE_GEMINI_API_KEY_BACKUP_1,
+  import.meta.env.VITE_GEMINI_API_KEY_BACKUP_2
+].filter(Boolean); // Remove empty keys
+
+let currentKeyIndex = 0;
+
+const getGenAIModel = () => {
+  const apiKey = API_KEYS[currentKeyIndex];
+  if (!apiKey) throw new Error("No valid Gemini API keys available.");
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  return genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    generationConfig: {
+      maxOutputTokens: 8192,
+      temperature: 0.7,
+    }
+  });
+};
+
+// Helper to rotate key on failure
+const rotateKey = () => {
+  if (currentKeyIndex < API_KEYS.length - 1) {
+    currentKeyIndex++;
+    console.warn(`Switching to Backup Gemini Key #${currentKeyIndex}`);
+    return true;
   }
-});
+  return false;
+};
 
 const SYSTEM_PROMPT = `
 You are a creative eco-friendly assistant for Indian households.
@@ -242,6 +264,7 @@ export async function analyzeWasteImage(base64Image) {
         },
       ];
 
+      const model = getGenAIModel(); // Get model with current key
       const result = await model.generateContent([SYSTEM_PROMPT, ...imageParts]);
       const response = await result.response;
       const text = response.text();
@@ -263,7 +286,14 @@ export async function analyzeWasteImage(base64Image) {
 
       // Handle both 429 (Too Many Requests) and 503 (Service Unavailable/Overloaded)
       if (error.message.includes("429") || error.status === 429 || error.message.includes("503") || error.status === 503) {
-        attempt++;
+        // Check if we can rotate keys
+        if (rotateKey()) {
+          console.log("Retrying with new key immediately...");
+          attempt = 0; // Reset attempts for new key? Or keep attempting?
+          // Let's not reset attempts to avoid infinite loops, just continue
+          continue;
+        }
+
         if (attempt < maxRetries) {
           const waitTime = 2000 * Math.pow(2, attempt); // Exponential backoff: 4s, 8s, 16s
           console.log(`Service overloaded or rate limit hit. Retrying in ${waitTime}ms...`);
@@ -343,6 +373,7 @@ JSON STRUCTURE:
 
   while (attempt < maxRetries) {
     try {
+      const model = getGenAIModel();
       const result = await model.generateContent(TEXT_SYSTEM_PROMPT);
       const response = await result.response;
       const text = response.text();
@@ -357,6 +388,11 @@ JSON STRUCTURE:
       console.error(`Gemini Text Analysis Error (Attempt ${attempt + 1})`, error);
       if (error.message.includes("429") || error.message.includes("503")) {
         attempt++;
+        if (rotateKey()) {
+          console.log("Retrying text analysis with new key...");
+          continue;
+        }
+
         if (attempt < maxRetries) {
           await delay(2000 * Math.pow(2, attempt));
           continue;
@@ -404,11 +440,16 @@ export async function chatWithEcoBot(userMessage, chatHistory = []) {
       **EcoBot**:
     `;
 
+    const model = getGenAIModel();
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text();
   } catch (error) {
     console.error("EcoBot Chat Error:", error);
+    // Simple retry for chat (optional)
+    if (rotateKey()) {
+      return chatWithEcoBot(userMessage, chatHistory);
+    }
     return "I'm having trouble connecting right now. Please try again or talk to our support team.";
   }
 }

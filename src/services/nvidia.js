@@ -30,7 +30,28 @@ export async function analyzeImageWithNvidia(base64Image) {
                             content: [
                                 {
                                     type: "text",
-                                    text: "Analyze this waste image. Identify the item, material type, condition (clean/dirty/damaged), and estimate the weight. Be concise."
+                                    text: `Analyze this image strictly. 
+                                    
+                                    1. VALIDATION CHECK:
+                                    Check if the image falls into any of these RESTRICTED categories:
+                                    - No Waste Present: Selfies, Group photos, Pets, Landscapes, Food plates, App screenshots, Blank images.
+                                    - Non-Physical Content: Text-only images, Memes, Social media screenshots, Digital artwork, Documents.
+                                    - Unsafe / Harmful: Weapons, Illegal substances, Explicit content, Graphic violence.
+                                    - Highly Blurry / Unreadable: Completely dark, Overexposed, Extreme motion blur, Camera covered.
+                                    - Non-Recyclable Uploads: Human body parts, Animals, Running vehicles, Buildings, Clouds.
+
+                                    2. RESPONSE FORMAT (JSON ONLY):
+                                    You MUST return a valid JSON object with the following structure:
+                                    {
+                                        "valid": boolean, // true if it is a physical waste item, false if restricted
+                                        "refusal_category": "string OR null", // e.g., "No Waste Present", "Unsafe", "Blurry", "Non-Physical"
+                                        "refusal_reason": "string OR null", // brief explanation if valid is false
+                                        "analysis": "string OR null" // If valid is true: Identify item, material, condition, and estimate weight.
+                                    }
+                                    
+                                    If the image is VALID waste, set "valid": true and provide the "analysis".
+                                    If the image is RESTRICTED, set "valid": false, identify the "refusal_category", and provide a "refusal_reason".
+                                    `
                                 },
                                 {
                                     type: "image_url",
@@ -42,7 +63,7 @@ export async function analyzeImageWithNvidia(base64Image) {
                         }
                     ],
                     max_tokens: 500,
-                    temperature: 0.2,
+                    temperature: 0.2, // Low temperature for more deterministic JSON
                     top_p: 0.7
                 })
             }

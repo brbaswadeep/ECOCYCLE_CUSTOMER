@@ -65,22 +65,28 @@ export default function EcoBot() {
                 <div className="bg-white w-80 sm:w-96 rounded-3xl shadow-2xl border border-brand-brown/10 overflow-hidden animate-in slide-in-from-bottom-5 duration-300 origin-bottom-right">
 
                     {/* Header */}
-                    <div className="bg-brand-brown p-4 flex justify-between items-center text-white">
-                        <div className="flex items-center gap-2">
-                            {mode === 'bot' && (
-                                <button onClick={() => setMode('menu')} className="hover:bg-white/10 p-1 rounded-full mr-1">
-                                    <ChevronRight className="w-5 h-5 rotate-180" />
-                                </button>
-                            )}
+                    <div className="bg-brand-brown p-4 flex justify-between items-center text-white relative">
+                        {mode === 'bot' && (
+                            <button
+                                onClick={() => setMode('menu')}
+                                className="absolute left-4 p-1 hover:bg-white/20 rounded-full transition-colors"
+                                title="Back to Menu"
+                            >
+                                <ChevronRight className="w-6 h-6 rotate-180" />
+                            </button>
+                        )}
+
+                        <div className="flex items-center gap-2 mx-auto">
                             <div className="p-2 bg-white/10 rounded-full">
                                 {mode === 'bot' ? <Bot className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
                             </div>
-                            <div>
+                            <div className="text-center">
                                 <h3 className="font-bold text-sm">{mode === 'bot' ? 'EcoBot Assistant' : 'EcoCycle Support'}</h3>
                                 <p className="text-[10px] opacity-70">Always here to help</p>
                             </div>
                         </div>
-                        <button onClick={toggleOpen} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+
+                        <button onClick={toggleOpen} className="absolute right-4 p-2 hover:bg-white/10 rounded-full transition-colors">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -128,8 +134,8 @@ export default function EcoBot() {
                                     <div key={msg.id} className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}>
                                         <div
                                             className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed shadow-sm ${msg.isUser
-                                                    ? 'bg-brand-orange text-white rounded-br-sm'
-                                                    : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
+                                                ? 'bg-brand-orange text-white rounded-br-sm'
+                                                : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
                                                 }`}
                                         >
                                             {msg.text}
