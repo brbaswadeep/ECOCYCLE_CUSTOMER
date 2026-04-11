@@ -284,8 +284,10 @@ export async function analyzeWasteImage(base64Image) {
     } catch (error) {
       console.error(`Gemini Analysis Error (Attempt ${attempt + 1}/${maxRetries}):`, error);
 
-      // Handle both 429 (Too Many Requests) and 503 (Service Unavailable/Overloaded)
-      if (error.message.includes("429") || error.status === 429 || error.message.includes("503") || error.status === 503) {
+      // Handle 403 (Denied), 429 (Too Many Requests), and 503 (Service Unavailable/Overloaded)
+      if (error.message.includes("429") || error.status === 429 || 
+          error.message.includes("503") || error.status === 503 || 
+          error.message.includes("403") || error.status === 403) {
         // Check if we can rotate keys
         if (rotateKey()) {
           console.log("Retrying with new key immediately...");
@@ -386,7 +388,7 @@ JSON STRUCTURE:
       return JSON.parse(text.substring(startIndex, endIndex + 1));
     } catch (error) {
       console.error(`Gemini Text Analysis Error (Attempt ${attempt + 1})`, error);
-      if (error.message.includes("429") || error.message.includes("503")) {
+      if (error.message.includes("429") || error.message.includes("503") || error.message.includes("403")) {
         attempt++;
         if (rotateKey()) {
           console.log("Retrying text analysis with new key...");
