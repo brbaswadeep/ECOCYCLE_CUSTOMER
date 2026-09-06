@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LogIn, User, LayoutDashboard, History, MapPin, Scan, Menu, X, LogOut, Leaf, MessageCircle, ShoppingBag } from 'lucide-react';
+import { LogIn, User, LayoutDashboard, History, MapPin, Scan, Menu, X, LogOut, Leaf, MessageCircle, ShoppingBag, Coins } from 'lucide-react';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import logo from '../assets/logo.png';
 import LocationRequiredPopup from '../components/LocationRequiredPopup';
 import EcoBot from '../components/EcoBot';
@@ -20,6 +20,8 @@ export default function Layout() {
 
     // Track unread messages
     const [unreadCount, setUnreadCount] = useState(0);
+    // Track live EcoPoints balance
+    const [userEcoPoints, setUserEcoPoints] = useState(0);
 
     React.useEffect(() => {
         if (!currentUser) return;
@@ -34,7 +36,18 @@ export default function Layout() {
             });
             setUnreadCount(count);
         });
-        return () => unsubscribe();
+
+        // Live EcoPoints
+        const unsubPoints = onSnapshot(doc(db, 'customers', currentUser.uid), (docSnap) => {
+            if (docSnap.exists()) {
+                setUserEcoPoints(docSnap.data().ecoPoints || 0);
+            }
+        });
+
+        return () => {
+            unsubscribe();
+            unsubPoints();
+        };
     }, [currentUser]);
 
     return (
@@ -56,6 +69,14 @@ export default function Layout() {
                     <div className="space-y-1.5">
                         <NavLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" active={location.pathname === '/dashboard'} />
                         <NavLink to="/shop" icon={<ShoppingBag size={20} />} label="Shop" active={location.pathname === '/shop'} />
+                        <NavLink 
+                            to="/ecopoints" 
+                            icon={<Coins size={20} />} 
+                            label="EcoPoints" 
+                            active={location.pathname === '/ecopoints'} 
+                            badge={userEcoPoints > 0 ? `${userEcoPoints} pts` : null}
+                            badgeColor="bg-amber-600 text-white"
+                        />
                         <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
                         <NavLink to="/history" icon={<History size={20} />} label="My Activity" active={location.pathname === '/history'} />
                     </div>
@@ -119,6 +140,14 @@ export default function Layout() {
                             <div className="space-y-1.5 flex-1">
                                 <NavLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" active={location.pathname === '/dashboard'} />
                                 <NavLink to="/shop" icon={<ShoppingBag size={20} />} label="Shop" active={location.pathname === '/shop'} />
+                                <NavLink 
+                                    to="/ecopoints" 
+                                    icon={<Coins size={20} />} 
+                                    label="EcoPoints" 
+                                    active={location.pathname === '/ecopoints'} 
+                                    badge={userEcoPoints > 0 ? `${userEcoPoints} pts` : null}
+                                    badgeColor="bg-amber-600 text-white"
+                                />
                                 <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
                                 <NavLink to="/history" icon={<History size={20} />} label="My Activity" active={location.pathname === '/history'} />
                                 <NavLink to="/smart-scan" icon={<Scan size={20} />} label="Smart Scan" active={location.pathname === '/smart-scan'} />
@@ -143,7 +172,7 @@ export default function Layout() {
     );
 }
 
-function NavLink({ to, icon, label, active, badge }) {
+function NavLink({ to, icon, label, active, badge, badgeColor }) {
     return (
         <Link
             to={to}
@@ -154,9 +183,13 @@ function NavLink({ to, icon, label, active, badge }) {
         >
             <div className={active ? 'text-white' : 'text-brand-brown/60'}>{icon}</div>
             <span className="flex-1">{label}</span>
-            {badge > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded text-center ${active ? 'bg-white text-brand-brown' : 'bg-brand-red text-white'}`}>
-                    {badge > 99 ? '99+' : badge}
+            {badge && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded text-center ${
+                    active 
+                        ? 'bg-white text-brand-brown' 
+                        : (badgeColor || 'bg-brand-red text-white')
+                }`}>
+                    {badge}
                 </span>
             )}
         </Link>

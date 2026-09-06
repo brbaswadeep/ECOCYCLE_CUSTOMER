@@ -2,19 +2,21 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     ShoppingBag, Search, Filter, Star, Plus, Check, X, Tag, Package, 
     Recycle, Minus, Trash2, History, Image as ImageIcon, ArrowRight, 
-    Truck, ShieldCheck, AlertCircle, Sparkles, MapPin, ChevronRight, CheckCircle2
+    Truck, ShieldCheck, AlertCircle, Sparkles, MapPin, ChevronRight, CheckCircle2,
+    Coins
 } from 'lucide-react';
 import ecoshopLogo from '../assets/Ecoshop.png';
 import InvoiceModal from '../components/InvoiceModal';
 import { db } from '../firebase';
 import { 
     collection, query, getDocs, addDoc, serverTimestamp, 
-    where, doc, updateDoc, increment, deleteDoc 
+    where, doc, updateDoc, increment, deleteDoc, onSnapshot 
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const CATEGORIES = ["All", "General", "Gardening", "Kitchen", "Accessories", "Outdoor", "Decor", "Furniture"];
+const POINTS_PER_RUPEE = 25; // Strict conversion: 25 EcoPoints = 1 Rs (EcoShop exclusive)
 
 export default function Shop() {
     const [activeCategory, setActiveCategory] = useState("All");
@@ -29,6 +31,11 @@ export default function Shop() {
 
     const { currentUser } = useAuth();
     const navigate = useNavigate();
+
+    // EcoPoints state (25 EcoPoints = 1 Rs, EcoShop exclusive)
+    const [userEcoPoints, setUserEcoPoints] = useState(0);
+    const [useEcoPointsInCart, setUseEcoPointsInCart] = useState(false);
+    const [useEcoPointsInBuyModal, setUseEcoPointsInBuyModal] = useState(false);
 
     // Delivery address state
     const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -76,6 +83,23 @@ export default function Shop() {
             const addr = currentUser.location?.address || currentUser.address || "";
             setDeliveryAddress(addr);
         }
+    }, [currentUser]);
+
+    // Live listener for customer EcoPoints balance (strictly for EcoShop checkout)
+    useEffect(() => {
+        if (!currentUser?.uid) {
+            setUserEcoPoints(0);
+            return;
+        }
+        const unsub = onSnapshot(doc(db, "customers", currentUser.uid), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setUserEcoPoints(Number(data.ecoPoints || 0));
+            }
+        }, (err) => {
+            console.error("Error listening to customer ecoPoints:", err);
+        });
+        return () => unsub();
     }, [currentUser]);
 
     // Fetch Products
@@ -179,17 +203,38 @@ export default function Shop() {
         return item ? item.quantity : 0;
     };
 
-    // Transparent Bill Calculations
-    const calculateBill = (items) => {
+    // Transparent Bill Calculations with EcoPoints Redemption (25 EcoPoints = 1 Rs)
+    const calculateBill = (items, applyEcoPoints = false, availablePoints = 0) => {
         const subtotal = items.reduce((sum, item) => sum + (Number(item.price || 0) * (item.quantity || 1)), 0);
-        const gst = Math.round(subtotal * 0.18);
-        // Free delivery over ₹999, else ₹49
+        
+        let pointsDiscount = 0;
+        let pointsToRedeem = 0;
+
+        if (applyEcoPoints && availablePoints >= POINTS_PER_RUPEE && subtotal > 0) {
+            const maxDiscountInRupees = Math.floor(subtotal);
+            const possibleDiscountInRupees = Math.floor(availablePoints / POINTS_PER_RUPEE);
+            pointsDiscount = Math.min(maxDiscountInRupees, possibleDiscountInRupees);
+            pointsToRedeem = pointsDiscount * POINTS_PER_RUPEE;
+        }
+
+        const discountedSubtotal = Math.max(0, subtotal - pointsDiscount);
+        const gst = Math.round(discountedSubtotal * 0.18);
+        // Free delivery over ₹999 original subtotal, else ₹49
         const deliveryFee = subtotal > 0 ? (subtotal >= 999 ? 0 : 49) : 0;
-        const total = subtotal + gst + deliveryFee;
-        return { subtotal, gst, deliveryFee, total };
+        const total = discountedSubtotal + gst + deliveryFee;
+
+        return { 
+            subtotal, 
+            pointsDiscount, 
+            pointsToRedeem, 
+            discountedSubtotal, 
+            gst, 
+            deliveryFee, 
+            total 
+        };
     };
 
-    const cartBill = calculateBill(cart);
+    const cartBill = calculateBill(cart, useEcoPointsInCart, userEcoPoints);
 
     // Fetch Orders
     const fetchOrders = async () => {
@@ -246,13 +291,60 @@ export default function Shop() {
 
         setIsPurchasing(true);
         try {
-            for (const item of cart) {
-                const itemQty = Number(item.quantity) || 1;
-                const itemBill = calculateBill([{ ...item, quantity: itemQty }]);
+            const pointsDiscountTotal = cartBill.pointsDiscount;
+            const pointsToRedeemTotal = cartBill.pointsToRedeem;
 
+            // Deduct redeemed points from customer record and log ledger record
+            if (pointsToRedeemTotal > 0) {
+                try {
+                    const customerRef = doc(db, "customers", currentUser.uid);
+                    await updateDoc(customerRef, {
+                        ecoPoints: increment(-pointsToRedeemTotal),
+                        totalRedeemedPoints: increment(pointsToRedeemTotal)
+                    });
+
+                    await addDoc(collection(db, "customers", currentUser.uid, "pointsHistory"), {
+                        title: "EcoShop Checkout Discount",
+                        source: "EcoShop Cart",
+                        points: -pointsToRedeemTotal,
+                        type: "redeemed",
+                        description: `Redeemed ${pointsToRedeemTotal} EcoPoints (25 pts = ₹1) for ₹${pointsDiscountTotal} discount on EcoShop checkout`,
+                        createdAt: serverTimestamp()
+                    });
+                } catch (ptsErr) {
+                    console.error("Failed to deduct ecoPoints:", ptsErr);
+                }
+            }
+
+            let remainingDiscountToDistribute = pointsDiscountTotal;
+            let remainingPointsToDistribute = pointsToRedeemTotal;
+
+            for (let i = 0; i < cart.length; i++) {
+                const item = cart[i];
+                const itemQty = Number(item.quantity) || 1;
                 const productValue = Number(item.price || 0) * itemQty;
-                const platformFee = Math.round(productValue * 0.015);
-                const vendorEarnings = itemBill.total - platformFee;
+                
+                // Distribute points discount across items
+                let itemDiscount = 0;
+                let itemPoints = 0;
+                if (pointsDiscountTotal > 0 && cartBill.subtotal > 0) {
+                    if (i === cart.length - 1) {
+                        itemDiscount = remainingDiscountToDistribute;
+                        itemPoints = remainingPointsToDistribute;
+                    } else {
+                        itemDiscount = Math.min(remainingDiscountToDistribute, Math.floor((productValue / cartBill.subtotal) * pointsDiscountTotal));
+                        itemPoints = itemDiscount * POINTS_PER_RUPEE;
+                        remainingDiscountToDistribute -= itemDiscount;
+                        remainingPointsToDistribute -= itemPoints;
+                    }
+                }
+
+                const itemDiscountedSubtotal = Math.max(0, productValue - itemDiscount);
+                const itemGst = Math.round(itemDiscountedSubtotal * 0.18);
+                const itemDelivery = i === 0 ? cartBill.deliveryFee : 0;
+                const itemTotal = itemDiscountedSubtotal + itemGst + itemDelivery;
+                const platformFee = Math.round(itemDiscountedSubtotal * 0.015);
+                const vendorEarnings = Math.max(0, itemTotal - platformFee);
 
                 await addDoc(collection(db, "orders"), {
                     customerId: currentUser.uid,
@@ -264,12 +356,15 @@ export default function Shop() {
                     productId: item.id,
                     productName: item.name || "Eco Product",
                     productImage: item.image || (item.images && item.images[0]) || "",
-                    price: itemBill.total,
+                    price: itemTotal,
                     priceBreakdown: {
                         subtotal: productValue,
-                        gst: itemBill.gst,
-                        deliveryFee: itemBill.deliveryFee,
-                        total: itemBill.total,
+                        ecoPointsDiscount: itemDiscount,
+                        ecoPointsRedeemed: itemPoints,
+                        discountedSubtotal: itemDiscountedSubtotal,
+                        gst: itemGst,
+                        deliveryFee: itemDelivery,
+                        total: itemTotal,
                         platformFee: platformFee,
                         vendorEarnings: vendorEarnings
                     },
@@ -290,9 +385,14 @@ export default function Shop() {
             }
 
             setCart([]);
+            setUseEcoPointsInCart(false);
             setIsPurchasing(false);
             setIsCartOpen(false);
-            showToast("Order placed successfully! Thank you for supporting sustainable makers.", "success");
+            showToast(pointsDiscountTotal > 0 
+                ? `Order placed! Saved ₹${pointsDiscountTotal} with ${pointsToRedeemTotal} EcoPoints!` 
+                : "Order placed successfully! Thank you for supporting sustainable makers.", 
+                "success"
+            );
             fetchProducts();
         } catch (error) {
             console.error("Checkout error:", error);
@@ -312,11 +412,33 @@ export default function Shop() {
         setIsPurchasing(true);
         try {
             const qty = Number(modalQuantity) || 1;
-            const bill = calculateBill([{ ...selectedProduct, quantity: qty }]);
+            const bill = calculateBill([{ ...selectedProduct, quantity: qty }], useEcoPointsInBuyModal, userEcoPoints);
+
+            // Deduct redeemed points from customer record and log transaction
+            if (bill.pointsToRedeem > 0) {
+                try {
+                    const customerRef = doc(db, "customers", currentUser.uid);
+                    await updateDoc(customerRef, {
+                        ecoPoints: increment(-bill.pointsToRedeem),
+                        totalRedeemedPoints: increment(bill.pointsToRedeem)
+                    });
+
+                    await addDoc(collection(db, "customers", currentUser.uid, "pointsHistory"), {
+                        title: "EcoShop Checkout Discount",
+                        source: "EcoShop Order",
+                        points: -bill.pointsToRedeem,
+                        type: "redeemed",
+                        description: `Redeemed ${bill.pointsToRedeem} EcoPoints (25 pts = ₹1) for ₹${bill.pointsDiscount} discount on ${selectedProduct.name}`,
+                        createdAt: serverTimestamp()
+                    });
+                } catch (ptsErr) {
+                    console.error("Failed to deduct ecoPoints:", ptsErr);
+                }
+            }
 
             const productValue = Number(selectedProduct.price || 0) * qty;
-            const platformFee = Math.round(productValue * 0.015);
-            const vendorEarnings = bill.total - platformFee;
+            const platformFee = Math.round(bill.discountedSubtotal * 0.015);
+            const vendorEarnings = Math.max(0, bill.total - platformFee);
 
             await addDoc(collection(db, "orders"), {
                 customerId: currentUser.uid,
@@ -331,6 +453,9 @@ export default function Shop() {
                 price: bill.total,
                 priceBreakdown: {
                     subtotal: productValue,
+                    ecoPointsDiscount: bill.pointsDiscount,
+                    ecoPointsRedeemed: bill.pointsToRedeem,
+                    discountedSubtotal: bill.discountedSubtotal,
                     gst: bill.gst,
                     deliveryFee: bill.deliveryFee,
                     total: bill.total,
@@ -354,8 +479,13 @@ export default function Shop() {
 
             setIsPurchasing(false);
             setShowBuyModal(false);
+            setUseEcoPointsInBuyModal(false);
             setSelectedProduct(null);
-            showToast("Purchase successful! Track your package in My Orders.", "success");
+            showToast(bill.pointsDiscount > 0
+                ? `Purchase successful! Saved ₹${bill.pointsDiscount} with ${bill.pointsToRedeem} EcoPoints!`
+                : "Purchase successful! Track your package in My Orders.", 
+                "success"
+            );
             fetchProducts();
         } catch (error) {
             console.error("Error creating order:", error);
@@ -439,12 +569,24 @@ export default function Shop() {
                         </span>
                     </div>
 
-                    {/* Prominent, attractive Orders & Cart Buttons */}
-                    <div className="flex items-center gap-3 self-end sm:self-auto">
+                    {/* Prominent, attractive Orders, EcoPoints & Cart Buttons */}
+                    <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto flex-wrap sm:flex-nowrap">
+                        <Link
+                            to="/ecopoints"
+                            className="flex items-center gap-1.5 px-3 py-2.5 bg-amber-50 hover:bg-amber-100/80 text-amber-900 rounded-xl font-bold border border-amber-200 shadow-xs transition-all active:scale-95 text-xs"
+                            title="Your EcoPoints (25 pts = ₹1 discount exclusively in EcoShop)"
+                        >
+                            <Coins size={16} className="text-amber-600" />
+                            <span className="font-extrabold">{userEcoPoints} pts</span>
+                            <span className="hidden md:inline text-[11px] text-amber-800 font-semibold bg-amber-100/90 px-1.5 py-0.5 rounded-md border border-amber-200/50">
+                                ≈ ₹{Math.floor(userEcoPoints / POINTS_PER_RUPEE)} off
+                            </span>
+                        </Link>
+
                         <button
                             onClick={fetchOrders}
                             disabled={loadingOrders}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-white text-brand-brown rounded-xl font-bold hover:bg-brand-cream/60 border border-brand-brown/15 shadow-sm hover:shadow transition-all active:scale-95 text-xs sm:text-sm"
+                            className="flex items-center gap-2 px-3.5 sm:px-4 py-2.5 bg-white text-brand-brown rounded-xl font-bold hover:bg-brand-cream/60 border border-brand-brown/15 shadow-sm hover:shadow transition-all active:scale-95 text-xs sm:text-sm"
                             title="View order history & tracking"
                         >
                             <History size={17} className="text-brand-brown/70" />
@@ -453,7 +595,7 @@ export default function Shop() {
 
                         <button
                             onClick={() => setIsCartOpen(true)}
-                            className="flex items-center gap-2.5 px-5 py-2.5 bg-brand-brown text-white rounded-xl font-bold hover:bg-brand-black shadow-sm hover:shadow-md transition-all active:scale-95 text-xs sm:text-sm group"
+                            className="flex items-center gap-2.5 px-4 sm:px-5 py-2.5 bg-brand-brown text-white rounded-xl font-bold hover:bg-brand-black shadow-sm hover:shadow-md transition-all active:scale-95 text-xs sm:text-sm group"
                             title="View your shopping cart"
                         >
                             <div className="relative flex items-center">
@@ -926,7 +1068,7 @@ export default function Shop() {
                         </div>
 
                         {/* Delivery Address Field */}
-                        <div className="mb-4 space-y-1.5">
+                        <div className="mb-3 space-y-1.5">
                             <label className="block text-xs font-bold text-brand-brown uppercase tracking-wider flex items-center gap-1">
                                 <MapPin size={13} className="text-brand-orange" />
                                 <span>Delivery Address</span>
@@ -940,15 +1082,59 @@ export default function Shop() {
                             />
                         </div>
 
+                        {/* EcoPoints Redemption Widget */}
+                        <div className="mb-4 p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input 
+                                        type="checkbox"
+                                        checked={useEcoPointsInBuyModal}
+                                        onChange={(e) => setUseEcoPointsInBuyModal(e.target.checked)}
+                                        disabled={userEcoPoints < POINTS_PER_RUPEE}
+                                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300"
+                                    />
+                                    <div className="flex items-center gap-1.5">
+                                        <Coins size={14} className="text-amber-600" />
+                                        <span className="text-xs font-bold text-amber-950">
+                                            Redeem EcoPoints (25 pts = ₹1)
+                                        </span>
+                                    </div>
+                                </label>
+                                <span className="text-[11px] font-extrabold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200">
+                                    {userEcoPoints} pts
+                                </span>
+                            </div>
+                            <p className="text-[10px] text-amber-800/80 pl-6">
+                                {userEcoPoints >= POINTS_PER_RUPEE ? (
+                                    <span>
+                                        Save up to <strong className="font-bold text-emerald-700">₹{Math.floor(userEcoPoints / POINTS_PER_RUPEE)}</strong>. Strictly usable for instant discounts on EcoShop orders.
+                                    </span>
+                                ) : (
+                                    <span>
+                                        You need at least 25 EcoPoints to redeem a ₹1 discount.
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+
                         {/* Bill Breakdown */}
                         {(() => {
-                            const bill = calculateBill([{ ...selectedProduct, quantity: modalQuantity }]);
+                            const bill = calculateBill([{ ...selectedProduct, quantity: modalQuantity }], useEcoPointsInBuyModal, userEcoPoints);
                             return (
                                 <div className="bg-gray-50 p-3.5 rounded-xl mb-5 space-y-2 text-xs">
                                     <div className="flex justify-between text-brand-brown/70">
                                         <span>Item Subtotal ({modalQuantity} items)</span>
                                         <span>₹{bill.subtotal}</span>
                                     </div>
+                                    {bill.pointsDiscount > 0 && (
+                                        <div className="flex justify-between text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200/60">
+                                            <span className="flex items-center gap-1">
+                                                <Coins size={12} />
+                                                EcoPoints Discount ({bill.pointsToRedeem} pts)
+                                            </span>
+                                            <span>-₹{bill.pointsDiscount}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-brand-brown/70">
                                         <span>GST (18%)</span>
                                         <span>₹{bill.gst}</span>
@@ -1117,11 +1303,55 @@ export default function Shop() {
                                     />
                                 </div>
 
+                                {/* EcoPoints Redemption Widget in Cart */}
+                                <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input 
+                                                type="checkbox"
+                                                checked={useEcoPointsInCart}
+                                                onChange={(e) => setUseEcoPointsInCart(e.target.checked)}
+                                                disabled={userEcoPoints < POINTS_PER_RUPEE}
+                                                className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-amber-300"
+                                            />
+                                            <div className="flex items-center gap-1.5">
+                                                <Coins size={14} className="text-amber-600" />
+                                                <span className="text-xs font-bold text-amber-950">
+                                                    Redeem EcoPoints (25 pts = ₹1)
+                                                </span>
+                                            </div>
+                                        </label>
+                                        <span className="text-[11px] font-extrabold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200">
+                                            {userEcoPoints} pts
+                                        </span>
+                                    </div>
+                                    <p className="text-[10px] text-amber-800/80 pl-6">
+                                        {userEcoPoints >= POINTS_PER_RUPEE ? (
+                                            <span>
+                                                Save up to <strong className="font-bold text-emerald-700">₹{Math.floor(userEcoPoints / POINTS_PER_RUPEE)}</strong>. Exclusively usable on EcoShop checkouts.
+                                            </span>
+                                        ) : (
+                                            <span>
+                                                You need at least 25 EcoPoints to redeem a ₹1 discount.
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
+
                                 <div className="space-y-1.5 text-xs">
                                     <div className="flex justify-between text-brand-brown/70">
                                         <span>Subtotal</span>
                                         <span>₹{cartBill.subtotal}</span>
                                     </div>
+                                    {cartBill.pointsDiscount > 0 && (
+                                        <div className="flex justify-between text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200/60">
+                                            <span className="flex items-center gap-1">
+                                                <Coins size={12} />
+                                                EcoPoints Discount ({cartBill.pointsToRedeem} pts)
+                                            </span>
+                                            <span>-₹{cartBill.pointsDiscount}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-brand-brown/70">
                                         <span>GST (18%)</span>
                                         <span>₹{cartBill.gst}</span>

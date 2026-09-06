@@ -171,7 +171,7 @@ export default function AnalysisResult({ result, image, imageUrl, onReset, onDon
                             onClick={() => handleVendorRequest(null)}
                             className={`w-full py-4 mb-4 text-white font-bold rounded-xl hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 animate-pulse-subtle ${canSell ? 'bg-brand-red hover:bg-[#c4442b]' : 'bg-brand-brown hover:bg-brand-black'}`}
                         >
-                            <div className="bg-white/20 p-2 rounded-full">
+                            <div className="bg-white/20 p-2 rounded-lg">
                                 <Store className="w-5 h-5" />
                             </div>
                             <div className="flex flex-col items-start leading-tight">

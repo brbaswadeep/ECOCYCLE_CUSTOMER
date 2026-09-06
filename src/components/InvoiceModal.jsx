@@ -142,6 +142,12 @@ export default function InvoiceModal({ order, onClose }) {
                                 <span>Subtotal</span>
                                 <span>₹{priceBreakdown.subtotal}</span>
                             </div>
+                            {Number(priceBreakdown.ecoPointsDiscount || 0) > 0 && (
+                                <div className="flex justify-between text-emerald-700 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200/60">
+                                    <span className="text-xs">EcoPoints ({priceBreakdown.ecoPointsRedeemed || (priceBreakdown.ecoPointsDiscount * 25)} pts @ 25=₹1)</span>
+                                    <span>-₹{priceBreakdown.ecoPointsDiscount}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between text-gray-600">
                                 <span>GST (18%)</span>
                                 <span>₹{priceBreakdown.gst}</span>

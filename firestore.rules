@@ -7,11 +7,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Customers profile & history
+    // Customers profile, history & points transactions
     match /customers/{userId} {
       allow read, write: if isAuthenticated();
 
-      match /history/{historyId} {
+      match /{allChildren=**} {
         allow read, write: if isAuthenticated();
       }
     }

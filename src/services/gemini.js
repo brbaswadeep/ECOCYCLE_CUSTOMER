@@ -319,36 +319,31 @@ export async function generateIdeasFromText(nvidiaAnalysisText) {
 
   const TEXT_SYSTEM_PROMPT = `
 You are a creative eco-friendly assistant.
-INPUT: Visual description of a waste item.
+INPUT: Verified waste item details.
 TASK: Generate structured JSON with upcycling ideas & PRECISE PRICING.
 
-INPUT ANALYSIS:
-"${nvidiaAnalysisText}"
+INPUT DETAILS:
+${nvidiaAnalysisText}
 
 STRICT CONSTRAINTS:
-1. OUTPUT: Valid JSON ONLY. No Markdown.
-2. LENGTH: MAX 500 TOKENS total.
-3. CURRENCY: INR (₹).
-4. QUANTITY: EXACTLY 3 IDEAS.
+1. OUTPUT: Valid JSON ONLY. No markdown wrapping.
+2. CURRENCY: INR (₹).
+3. QUANTITY: EXACTLY 3 IDEAS.
+4. Value per idea: ₹100 - ₹350.
+5. Ideas must be practical, safe, and directly suited for the confirmed material and object.
 
 CONVERSION OPTIONS (Exact 3 ideas):
-- Value: ₹100 - ₹300 (STRICT).
-- Product Name: Perfect title.
-- Description: Perfect short summary (2-3 lines).
-- Step-by-Step Instructions: Array of 3-4 short, precise steps.
-
-CALCULATIONS:
-- Vendor_Gross_Value = BMV * Weight_kg * QF * EF * PVM
-- Max_Allowed_Price = New_Product_Price * 0.8 (20% Green Discount)
-- Final_Selling_Price = MIN(Vendor_Gross_Value, Max_Allowed_Price)
-- Vendor_Payout = Final_Selling_Price * 0.85 (15% Commission)
+- Product Name: Perfect, attractive title.
+- Description: Concise summary (2-3 lines).
+- Step-by-Step Instructions: Array of 3-4 short, clear steps.
+- Difficulty: Easy or Medium.
 
 JSON STRUCTURE:
 {
   "waste_analysis": {
-    "detected_items": [{ "material_type": "string", "specific_object": "string", "confidence_score": 0.9 }]
+    "detected_items": [{ "material_type": "string", "specific_object": "string", "confidence_score": 0.95 }]
   },
-  "quantity_estimation": { "approximate_weight_kg": number },
+  "quantity_estimation": { "approximate_weight_kg": number, "approximate_market_value": number },
   "environmental_impact": { "sustainability_score": number },
   "quality_assessment": { "cleanliness_level": "string", "damage_level": "string", "contamination_risk": "string" },
   "conversion_options": [
@@ -360,9 +355,9 @@ JSON STRUCTURE:
       "difficulty_level": "Easy",
       "pricing_analysis": {
         "base_material_value_per_kg": number,
-        "quality_factor": number,
-        "effort_factor": number,
-        "product_value_multiplier": number,
+        "quality_factor": 1.2,
+        "effort_factor": 1.1,
+        "product_value_multiplier": 1.3,
         "vendor_gross_value": number,
         "final_selling_price": number,
         "vendor_payout": number
@@ -381,11 +376,14 @@ JSON STRUCTURE:
       const text = response.text();
       console.log("RAW GEMINI RESPONSE (Text-to-JSON):", text);
 
-      const startIndex = text.indexOf('{');
-      const endIndex = text.lastIndexOf('}');
-      if (startIndex === -1 || endIndex === -1) throw new Error("Invalid response format");
+      const rawText = text.replace(/```json/gi, '').replace(/```/gi, '').trim();
+      const startIndex = rawText.indexOf('{');
+      const endIndex = rawText.lastIndexOf('}');
+      if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) {
+        throw new Error("Invalid response format from AI");
+      }
 
-      return JSON.parse(text.substring(startIndex, endIndex + 1));
+      return JSON.parse(rawText.substring(startIndex, endIndex + 1));
     } catch (error) {
       console.error(`Gemini Text Analysis Error (Attempt ${attempt + 1})`, error);
       attempt++;
