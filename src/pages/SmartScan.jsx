@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { generateIdeasFromTextOpenAI } from '../services/openai';
-import { generateIdeasFromText } from '../services/gemini'; // Import Gemini service fallback
+import { generateIdeasFromText } from '../services/gemini';
 import { analyzeImageWithNvidia } from '../services/nvidia';
-import { Upload, Camera, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
+import { Upload, Camera, Loader2, ArrowRight, AlertCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AnalysisResult from '../components/AnalysisResult';
 import RestrictionPopup from '../components/RestrictionPopup';
 import { useAuth } from '../context/AuthContext';
-import { db, storage } from '../firebase';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { db } from '../firebase';
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 
 export default function SmartScan() {
@@ -19,16 +18,16 @@ export default function SmartScan() {
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
 
-    // Restriction State
     const [showRestriction, setShowRestriction] = useState(false);
     const [restrictionCategory, setRestrictionCategory] = useState(null);
     const [restrictionReason, setRestrictionReason] = useState(null);
 
     const navigate = useNavigate();
     const { currentUser } = useAuth();
+    const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
 
     const handleImageUpload = (e) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0];
         if (file) {
             handleFile(file);
         }
@@ -65,10 +64,8 @@ export default function SmartScan() {
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-                // Compress to JPEG with 0.8 quality
                 const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
                 
-                // Show high-res preview but use compressed for API to prevent hangs
                 setPreview(reader.result);
                 setImage(compressedDataUrl);
                 setResult(null);
@@ -79,27 +76,14 @@ export default function SmartScan() {
         reader.readAsDataURL(file);
     };
 
-    const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
-
     const saveAnalysis = async (analysisData, imageUrl) => {
         if (!currentUser) return null;
-
-        let downloadURL = null;
-
-        try {
-            const timestamp = Date.now();
-            const storageRef = ref(storage, `scans/${currentUser.uid}/${timestamp}.jpg`);
-            await uploadString(storageRef, imageUrl, 'data_url');
-            downloadURL = await getDownloadURL(storageRef);
-        } catch (uploadError) {
-            console.error("Image upload failed (CORS or Network issue):", uploadError);
-        }
 
         try {
             const historyRef = doc(collection(db, "customers", currentUser.uid, "history"));
             const analysisToSave = {
                 ...analysisData,
-                imageUrl: downloadURL,
+                imageUrl: imageUrl || null,
                 timestamp: serverTimestamp(),
                 userId: currentUser.uid,
                 summary: {
@@ -111,11 +95,7 @@ export default function SmartScan() {
 
             await setDoc(historyRef, analysisToSave);
             console.log("Analysis saved successfully!", historyRef.id);
-
-            if (!downloadURL) {
-                alert("Analysis saved! (Image could not be saved due to network restrictions)");
-            }
-            return downloadURL;
+            return imageUrl;
         } catch (err) {
             console.error("CRITICAL ERROR SAVING ANALYSIS:", err);
             alert(`Failed to save history: ${err.message}`);
@@ -127,19 +107,39 @@ export default function SmartScan() {
         if (!image) return;
 
         setAnalyzing(true);
-        setStatusText('Identifying Item (NVIDIA)...');
+        setStatusText('Uploading image...');
         setError('');
+        
         try {
-            // Step 1: NVIDIA Analysis
-            console.log("Starting NVIDIA Analysis...");
+            const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'drrjsmqsh';
+            const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'ecocycle';
+            
+            const formData = new FormData();
+            formData.append('file', image);
+            formData.append('upload_preset', uploadPreset);
+            
+            let uploadedUrl = null;
+            try {
+                const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    uploadedUrl = data.secure_url;
+                    setUploadedImageUrl(uploadedUrl);
+                } else {
+                    console.warn("Cloudinary upload returned non-200 status:", response.status);
+                }
+            } catch (cloudErr) {
+                console.error("Cloudinary upload failed:", cloudErr);
+            }
+
+            setStatusText('Identifying Item (NVIDIA)...');
             const nvidiaResponse = await analyzeImageWithNvidia(image);
-            console.log("NVIDIA Result:", nvidiaResponse);
 
             let analysisText = nvidiaResponse;
-
-            // Attempt to parse JSON response from NVIDIA
             try {
-                // Sanitize response in case of markdown code blocks
                 const cleanResponse = nvidiaResponse.replace(/```json/g, '').replace(/```/g, '').trim();
                 const jsonResponse = JSON.parse(cleanResponse);
 
@@ -149,16 +149,14 @@ export default function SmartScan() {
                     setShowRestriction(true);
                     setAnalyzing(false);
                     setStatusText('Analyzing...');
-                    return; // STOP: Do not proceed to OpenAI
+                    return;
                 }
 
-                // If valid, use the analysis text from JSON
                 if (jsonResponse.analysis) {
                     analysisText = jsonResponse.analysis;
                 }
             } catch (e) {
                 console.warn("NVIDIA response was not valid JSON, treating as raw text fallback:", e);
-                // Fallback: Use raw response if parsing fails (legacy compatibility)
                 analysisText = nvidiaResponse;
             }
 
@@ -166,29 +164,24 @@ export default function SmartScan() {
                 throw new Error("Failed to identify item with NVIDIA.");
             }
 
-            // Step 2: OpenAI Ideas (with Gemini Fallback)
-            setStatusText('Generating Ideas (OpenAI)...');
+            setStatusText('Generating Ideas (AI)...');
             let data;
-
             try {
-                // Primary: Try OpenAI
-                data = await generateIdeasFromTextOpenAI(analysisText);
-            } catch (openaiError) {
-                console.warn("OpenAI Failed, switching to Gemini Fallback:", openaiError);
-                setStatusText('OpenAI Busy. Switching to Gemini...');
-
+                // Primary: Use Gemini 2.5 Flash with verified active API keys
+                data = await generateIdeasFromText(analysisText);
+            } catch (geminiError) {
+                console.warn("Gemini Failed, switching to OpenAI Fallback:", geminiError);
+                setStatusText('Switching to OpenAI...');
                 try {
-                    // Fallback: Try Gemini
-                    data = await generateIdeasFromText(analysisText);
-                } catch (geminiError) {
-                    console.error("Gemini Fallback also failed:", geminiError);
-                    throw new Error("Both AI services failed to generate ideas. Please try again later.");
+                    data = await generateIdeasFromTextOpenAI(analysisText);
+                } catch (openaiError) {
+                    console.error("All AI services failed:", openaiError);
+                    throw new Error("Unable to generate ideas at the moment. Please try again.");
                 }
             }
 
             setResult(data);
-            const url = await saveAnalysis(data, image);
-            setUploadedImageUrl(url);
+            await saveAnalysis(data, uploadedUrl);
         } catch (err) {
             console.error("Analysis Pipeline Error:", err);
             setError(err.message || 'Failed to analyze image. Please try again.');
@@ -201,8 +194,6 @@ export default function SmartScan() {
     return (
         <div className="min-h-screen bg-brand-cream pt-24 pb-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-5xl mx-auto space-y-8">
-
-                {/* Header */}
                 <div className="text-center">
                     <h1 className="text-4xl font-extrabold text-brand-brown mb-4">Smart Scan AI Analysis</h1>
                     <p className="text-brand-brown/60 max-w-2xl mx-auto">
@@ -210,7 +201,6 @@ export default function SmartScan() {
                     </p>
                 </div>
 
-                {/* Upload Section */}
                 {!result && (
                     <div className="bg-white rounded-3xl shadow-xl p-8 border-2 border-dashed border-brand-brown/20 hover:border-brand-red/50 transition-colors">
                         <div className="flex flex-col items-center justify-center space-y-6">
@@ -219,39 +209,41 @@ export default function SmartScan() {
                                     <img src={preview} alt="Upload preview" className="w-full h-full object-contain" />
                                     <button
                                         onClick={() => { setPreview(null); setImage(null); }}
-                                        className="absolute top-2 right-2 p-2 bg-white/90 rounded-full shadow-sm hover:text-brand-red"
+                                        className="absolute top-2 right-2 p-2 bg-white/90 rounded-full shadow-sm hover:text-brand-red transition-colors"
                                     >
-                                        <Upload className="w-5 h-5" />
+                                        <X className="w-5 h-5" />
                                     </button>
                                 </div>
                             ) : (
-                                <div className="text-center space-y-4 py-12">
+                                <div className="text-center space-y-4 py-12 w-full">
                                     <div className="w-20 h-20 bg-brand-cream rounded-full flex items-center justify-center mx-auto text-brand-brown/50">
                                         <Camera className="w-10 h-10" />
                                     </div>
                                     <div>
                                         <p className="text-xl font-bold text-brand-brown">Drag & drop or click to upload</p>
-                                        <p className="text-sm text-brand-brown/50 mt-1">Supports JPG, PNG (Max 5MB)</p>
+                                        <p className="text-sm text-brand-brown/50 mt-1">Select a single photo (Max 5MB)</p>
                                     </div>
                                 </div>
                             )}
 
                             <div className="flex gap-4 w-full max-w-xs">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageUpload}
-                                    className="hidden"
-                                    id="image-upload"
-                                />
                                 {!preview && (
-                                    <label
-                                        htmlFor="image-upload"
-                                        className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-6 py-3 bg-white border border-brand-brown/20 rounded-xl font-bold text-brand-brown hover:bg-brand-cream transition-colors"
-                                    >
-                                        <Upload className="w-5 h-5" />
-                                        Select Image
-                                    </label>
+                                    <>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            className="hidden"
+                                            id="image-upload"
+                                        />
+                                        <label
+                                            htmlFor="image-upload"
+                                            className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-6 py-3 bg-white border border-brand-brown/20 rounded-xl font-bold text-brand-brown hover:bg-brand-cream transition-colors"
+                                        >
+                                            <Upload className="w-5 h-5" />
+                                            Select Image
+                                        </label>
+                                    </>
                                 )}
                                 {preview && (
                                     <button
@@ -284,7 +276,6 @@ export default function SmartScan() {
                     </div>
                 )}
 
-                {/* Results Section */}
                 {result && (
                     <AnalysisResult
                         result={result}
@@ -296,7 +287,6 @@ export default function SmartScan() {
                 )}
             </div>
 
-            {/* Restriction Popup */}
             <RestrictionPopup
                 isOpen={showRestriction}
                 onClose={() => {

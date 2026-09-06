@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Loader2, Eye, EyeOff, User, Phone, Lock } from 'lucide-react';
-import logo from '../assets/logo.png';
-
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
 
@@ -112,18 +110,20 @@ export default function AuthPage() {
             {/* LEFT PANEL: FORM */}
             <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 lg:px-16 xl:px-24 py-12 bg-white relative">
 
-                {/* Logo Area */}
-                <Link to="/" className="absolute top-6 left-6 hover:scale-105 transition-transform duration-300 drop-shadow-md">
-                    <img src={logo} alt="EcoCycle Logo" className="h-24 w-auto object-contain" />
-                </Link>
+
 
                 <div className="mt-12 lg:mt-0 w-full max-w-lg mx-auto">
-                    <h1 className="text-3xl font-extrabold text-brand-black mb-2">
+                    <div className="text-center mb-10">
+                        <Link to="/" className="inline-block hover:scale-105 transition-transform duration-300 mb-6 drop-shadow-md">
+                            <img src="/favicon.png" alt="EcoCycle Logo" className="h-24 w-auto object-contain mx-auto" />
+                        </Link>
+                        <h1 className="text-3xl font-extrabold text-brand-black mb-2">
                         {isForgotPassword ? 'Reset Password' : (isLogin ? 'Welcome back !' : 'Create Account')}
                     </h1>
-                    <p className="text-brand-brown/70 mb-6">
-                        {isForgotPassword ? '' : (isLogin ? 'Enter to get unlimited access to data & information.' : 'Join Ecocycle today.')}
-                    </p>
+                        <p className="text-brand-brown/70">
+                            {isForgotPassword ? '' : (isLogin ? 'Enter to get unlimited access to data & information.' : 'Join Ecocycle today.')}
+                        </p>
+                    </div>
 
                     {error && (
                         <div className="mb-4 bg-red-50 border-l-4 border-brand-red p-3 text-sm text-brand-red font-medium rounded-r animate-pulse">
@@ -227,6 +227,7 @@ export default function AuthPage() {
                                                 required
                                                 value={password}
                                                 onChange={(e) => setPassword(e.target.value)}
+                                                autoComplete={isLogin ? "current-password" : "new-password"}
                                                 className="w-full pl-10 pr-10 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red text-brand-black placeholder-gray-400 transition-colors"
                                                 placeholder="Min. 8 characters"
                                             />
@@ -250,6 +251,7 @@ export default function AuthPage() {
                                                     required
                                                     value={confirmPassword}
                                                     onChange={(e) => setConfirmPassword(e.target.value)}
+                                                    autoComplete="new-password"
                                                     className="w-full pl-10 pr-10 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red text-brand-black placeholder-gray-400 transition-colors"
                                                     placeholder="Repeat Password"
                                                 />

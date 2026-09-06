@@ -8,9 +8,8 @@ export default function LandingPage() {
             <section className="relative pt-20 pb-32 lg:pt-32 bg-gradient-to-br from-brand-cream to-white">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
 
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-orange/20 text-brand-orange text-sm font-medium mb-8 animate-fade-in-down border border-brand-orange/20">
-                        <Sparkles className="w-4 h-4" />
-                        <span>AI-Powered Waste Management</span>
+                    <div className="mb-8 flex justify-center animate-fade-in-down">
+                        <img src="/favicon.png" alt="EcoCycle Logo" className="h-28 w-auto object-contain drop-shadow-lg" />
                     </div>
 
                     <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-brand-black mb-6 drop-shadow-sm">

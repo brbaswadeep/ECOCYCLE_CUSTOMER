@@ -44,37 +44,37 @@ export default function Layout() {
 
             {/* Sidebar (Desktop) */}
             <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-brand-brown/10 h-full fixed left-0 top-0 z-50">
-                {/* Logo Section - Icon Only, Big */}
-                <div className="h-28 flex items-center justify-center border-b border-brand-brown/5">
-                    <Link to={currentUser ? "/dashboard" : "/"} className="hover:scale-110 hover:rotate-3 transition-all duration-300 drop-shadow-lg">
-                        <img src={logo} alt="EcoCycle" className="h-20 w-auto object-contain" />
+                {/* Logo Section */}
+                <div className="h-24 flex items-center justify-center border-b border-brand-brown/10 px-6 bg-white">
+                    <Link to={currentUser ? "/dashboard" : "/"} className="hover:opacity-90 transition-opacity">
+                        <img src={logo} alt="EcoCycle" className="h-14 w-auto object-contain" />
                     </Link>
                 </div>
 
                 {/* Navigation */}
-                <div className="flex-1 overflow-y-auto py-8 px-5 flex flex-col gap-6">
-                    <div className="space-y-4">
-                        <NavLink to="/dashboard" icon={<LayoutDashboard size={24} />} label="Dashboard" active={location.pathname === '/dashboard'} />
-                        <NavLink to="/shop" icon={<ShoppingBag size={24} />} label="Shop" active={location.pathname === '/shop'} />
-                        <NavLink to="/messages" icon={<MessageCircle size={24} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
-                        <NavLink to="/history" icon={<History size={24} />} label="My Activity" active={location.pathname === '/history'} />
+                <div className="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-6">
+                    <div className="space-y-1.5">
+                        <NavLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" active={location.pathname === '/dashboard'} />
+                        <NavLink to="/shop" icon={<ShoppingBag size={20} />} label="Shop" active={location.pathname === '/shop'} />
+                        <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
+                        <NavLink to="/history" icon={<History size={20} />} label="My Activity" active={location.pathname === '/history'} />
                     </div>
 
                     {/* Smart Scan Card */}
                     <div className="mt-auto">
-                        <div className="bg-gradient-to-br from-brand-red to-brand-orange rounded-2xl p-5 text-white shadow-xl transform transition-transform hover:scale-[1.02]">
-                            <div className="flex items-center gap-3 mb-3">
-                                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                                    <Scan className="w-5 h-5 text-white" />
+                        <div className="bg-brand-cream/40 border border-brand-brown/10 rounded-2xl p-4 shadow-sm space-y-2.5">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center flex-shrink-0">
+                                    <Scan className="w-4 h-4" />
                                 </div>
-                                <div className="font-bold">New Waste?</div>
+                                <div className="font-bold text-sm text-brand-black">Got Waste?</div>
                             </div>
-                            <div className="text-sm opacity-90 mb-4 font-medium leading-relaxed">
-                                Identify and recycle items in seconds with AI.
+                            <div className="text-xs text-brand-brown/70 leading-relaxed font-medium">
+                                Identify recyclables and discover upcycling ideas in seconds.
                             </div>
                             <Link
                                 to="/smart-scan"
-                                className="block w-full py-3 bg-white text-brand-red font-extrabold rounded-xl text-sm hover:bg-brand-cream transition-colors text-center shadow-md active:scale-95"
+                                className="block w-full py-2.5 bg-brand-red hover:bg-[#c94328] text-white font-bold rounded-xl text-xs text-center transition-colors shadow-sm"
                             >
                                 Start Smart Scan
                             </Link>
@@ -84,13 +84,13 @@ export default function Layout() {
 
                 {/* Footer/User Section in Sidebar */}
                 {currentUser && (
-                    <div className="p-4 border-t border-brand-brown/5 bg-brand-cream/30">
-                        <Link to="/profile" className="flex items-center gap-3 p-3 rounded-xl hover:bg-white transition-all shadow-sm hover:shadow-md border border-transparent hover:border-brand-brown/10 group">
-                            <div className="w-10 h-10 rounded-full bg-brand-orange text-white flex items-center justify-center font-bold text-sm shadow-md">
-                                {currentUser?.name?.[0]?.toUpperCase() || <User size={18} />}
+                    <div className="p-4 border-t border-brand-brown/10 bg-white">
+                        <Link to="/profile" className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-brand-cream/40 transition-colors border border-transparent hover:border-brand-brown/10 group">
+                            <div className="w-10 h-10 rounded-full bg-brand-brown text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0">
+                                {currentUser?.name?.[0]?.toUpperCase() || <User size={16} />}
                             </div>
                             <div className="flex-1 min-w-0">
-                                <div className="font-bold text-brand-brown text-sm truncate">{currentUser?.name || 'User'}</div>
+                                <div className="font-bold text-brand-black text-sm truncate">{currentUser?.name || 'User'}</div>
                                 <div className="text-xs text-brand-brown/60 truncate">View Profile</div>
                             </div>
                         </Link>
@@ -114,15 +114,16 @@ export default function Layout() {
 
                 {/* Mobile Menu Overlay */}
                 {isMobileMenuOpen && (
-                    <div className="lg:hidden absolute inset-0 z-30 bg-black/50 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
-                        <div className="absolute right-0 top-16 bottom-0 w-64 bg-white p-4 shadow-xl" onClick={e => e.stopPropagation()}>
-                            <div className="space-y-2">
+                    <div className="lg:hidden absolute inset-0 z-30 bg-black/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
+                        <div className="absolute right-0 top-16 bottom-0 w-64 bg-white p-4 shadow-xl border-l border-brand-brown/10 flex flex-col" onClick={e => e.stopPropagation()}>
+                            <div className="space-y-1.5 flex-1">
                                 <NavLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" active={location.pathname === '/dashboard'} />
                                 <NavLink to="/shop" icon={<ShoppingBag size={20} />} label="Shop" active={location.pathname === '/shop'} />
                                 <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
                                 <NavLink to="/history" icon={<History size={20} />} label="My Activity" active={location.pathname === '/history'} />
                                 <NavLink to="/smart-scan" icon={<Scan size={20} />} label="Smart Scan" active={location.pathname === '/smart-scan'} />
-                                <div className="h-px bg-brand-brown/10 my-4" />
+                            </div>
+                            <div className="pt-4 border-t border-brand-brown/10">
                                 <NavLink to="/profile" icon={<User size={20} />} label="Profile" active={location.pathname === '/profile'} />
                             </div>
                         </div>
@@ -146,15 +147,15 @@ function NavLink({ to, icon, label, active, badge }) {
     return (
         <Link
             to={to}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all duration-200 ${active
-                ? 'bg-brand-brown text-white shadow-lg shadow-brand-brown/20'
-                : 'text-brand-brown/70 hover:bg-brand-brown/5 hover:text-brand-brown'
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-colors ${active
+                ? 'bg-brand-brown text-white shadow-sm'
+                : 'text-brand-brown/70 hover:bg-brand-cream/60 hover:text-brand-brown'
                 }`}
         >
-            <div className={`${active ? 'text-white' : 'text-current'}`}>{icon}</div>
+            <div className={active ? 'text-white' : 'text-brand-brown/60'}>{icon}</div>
             <span className="flex-1">{label}</span>
             {badge > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${active ? 'bg-white text-brand-brown' : 'bg-red-500 text-white'}`}>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded text-center ${active ? 'bg-white text-brand-brown' : 'bg-brand-red text-white'}`}>
                     {badge > 99 ? '99+' : badge}
                 </span>
             )}

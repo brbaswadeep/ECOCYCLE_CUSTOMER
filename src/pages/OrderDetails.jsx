@@ -1,18 +1,61 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { db } from '../firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, ArrowLeft, Clock, MapPin, Truck, PlayCircle, Hourglass, CheckSquare, Calendar, Star, FileText, CheckCircle, ClipboardCheck, Factory, RefreshCw, Sparkles, PackageCheck, Leaf } from 'lucide-react';
+import { Loader2, ArrowLeft, Clock, MapPin, Truck, PlayCircle, Hourglass, CheckSquare, Calendar, Star, FileText, CheckCircle, ClipboardCheck, Factory, RefreshCw, Sparkles, PackageCheck, Leaf, Store } from 'lucide-react';
 import ChatModal from '../components/ChatModal';
 
 const TRACKING_STAGES = [
-    { id: 'accepted', label: 'Order Accepted', icon: ClipboardCheck },
-    { id: 'arrived', label: 'Arrived at Facility', icon: Truck },
-    { id: 'initiated', label: 'Processing Started', icon: Factory },
-    { id: 'processing', label: 'In Production', icon: RefreshCw },
-    { id: 'finishing', label: 'Finishing Touches', icon: Sparkles },
-    { id: 'completed', label: 'Ready for Pickup', icon: PackageCheck }
+    {
+        id: 'requested',
+        label: 'Request Submitted',
+        short: 'Submitted',
+        description: 'Pickup request created by customer and waiting for vendor acceptance.',
+        icon: ClipboardCheck
+    },
+    {
+        id: 'accepted',
+        label: 'Order Accepted',
+        short: 'Accepted',
+        description: 'Vendor accepted pickup request and scheduled collection.',
+        icon: CheckCircle
+    },
+    {
+        id: 'arrived',
+        label: 'Arrived at Facility',
+        short: 'Arrived',
+        description: 'Scrap materials collected and safely received at processing plant.',
+        icon: Truck
+    },
+    {
+        id: 'initiated',
+        label: 'Processing Started',
+        short: 'Started',
+        description: 'Material segregation, weighing, and prep work initiated.',
+        icon: Factory
+    },
+    {
+        id: 'processing',
+        label: 'In Production',
+        short: 'Production',
+        description: 'Eco-transformation and industrial recycling actively underway.',
+        icon: RefreshCw
+    },
+    {
+        id: 'finishing',
+        label: 'Finishing Touches',
+        short: 'Finishing',
+        description: 'Quality inspection, final processing, and packaging.',
+        icon: Sparkles
+    },
+    {
+        id: 'completed',
+        label: 'Ready / Completed',
+        short: 'Completed',
+        description: 'Recycling cycle finished. Eco-credits and rewards disbursed.',
+        icon: PackageCheck
+    }
 ];
 
 export default function OrderDetails() {
@@ -23,12 +66,18 @@ export default function OrderDetails() {
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [vendor, setVendor] = useState(null);
+    const [toast, setToast] = useState(null);
 
     // Rating (if completed)
     const [ratingScore, setRatingScore] = useState(5);
     const [submittingRating, setSubmittingRating] = useState(false);
 
     const [showChat, setShowChat] = useState(false);
+
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     useEffect(() => {
         if (currentUser && orderId) fetchOrder();
@@ -50,7 +99,7 @@ export default function OrderDetails() {
                     }
                 }
             } else {
-                alert("Order not found");
+                showToast("Order not found", "error");
                 navigate('/history');
             }
         } catch (error) {
@@ -70,15 +119,10 @@ export default function OrderDetails() {
             });
             // Update local state
             setOrder(prev => ({ ...prev, userRating: ratingScore }));
-
-            // Should also update vendor average here (simplified for this view, logic exists in History.jsx)
-            // Ideally extract this logic to a service.
-            // For now, assume History.jsx or a cloud function handles aggregation, or we duplicate logic if critical.
-            // Let's rely on the user potentially going back to history or just updating the display here.
-
-            alert("Rating submitted!");
+            showToast("Rating submitted successfully!");
         } catch (error) {
             console.error(error);
+            showToast("Failed to submit review", "error");
         } finally {
             setSubmittingRating(false);
         }
@@ -90,7 +134,6 @@ export default function OrderDetails() {
     // Calculate Days Left
     const getCompletionDate = () => {
         if (!order.projectMeta?.estimatedCompletion) return null;
-        // Handle Firestore Timestamp or Date string/object
         const date = order.projectMeta.estimatedCompletion.toDate
             ? order.projectMeta.estimatedCompletion.toDate()
             : new Date(order.projectMeta.estimatedCompletion);
@@ -101,113 +144,294 @@ export default function OrderDetails() {
     const daysLeft = completionDate ?
         Math.ceil((completionDate - new Date()) / (1000 * 60 * 60 * 24)) : null;
 
-    const isCompleted = order.projectMeta?.trackingStage === 'completed';
-    const currentStageIdx = TRACKING_STAGES.findIndex(s => s.id === order.projectMeta?.trackingStage);
+    const getCurrentStageIndex = () => {
+        if (!order) return 0;
+        if (order.status === 'completed' || order.projectMeta?.trackingStage === 'completed') {
+            return TRACKING_STAGES.length - 1;
+        }
+        const stage = order.projectMeta?.trackingStage;
+        if (stage) {
+            const idx = TRACKING_STAGES.findIndex(s => s.id === stage);
+            if (idx !== -1) return idx;
+        }
+        if (order.status === 'accepted') {
+            return 1;
+        }
+        return 0; // 'requested'
+    };
+
+    const currentStageIdx = getCurrentStageIndex();
+    const isCompleted = order.projectMeta?.trackingStage === 'completed' || order.status === 'completed';
+    const progressPercent = Math.round((currentStageIdx / (TRACKING_STAGES.length - 1)) * 100);
+    const activeStage = TRACKING_STAGES[currentStageIdx];
 
     return (
-        <div className="min-h-screen bg-brand-cream pt-24 pb-12 px-4">
+        <div className="min-h-screen bg-brand-cream pt-24 pb-12 px-4 relative">
+            {/* Toast Notification */}
+            {toast && (
+                <div className="fixed top-24 right-6 z-[100] animate-in slide-in-from-top-3 fade-in duration-300">
+                    <div className={`px-4 py-3 rounded-2xl shadow-xl border flex items-center gap-3 text-sm font-bold ${
+                        toast.type === 'error'
+                            ? 'bg-rose-50 border-rose-200 text-rose-800'
+                            : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    }`}>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>{toast.message}</span>
+                    </div>
+                </div>
+            )}
+
             <div className="max-w-3xl mx-auto space-y-6">
 
                 {/* Header with Back Button */}
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-2 bg-white rounded-full shadow-sm hover:scale-110 transition-transform">
-                        <ArrowLeft className="w-5 h-5 text-brand-brown" />
-                    </button>
-                    <div>
-                        <h1 className="text-2xl font-bold text-brand-brown">Order Details</h1>
-                        <p className="text-xs text-brand-brown/60">ID: {order.id.slice(0, 8)}</p>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="p-2.5 bg-white rounded-2xl border border-brand-brown/10 shadow-2xs hover:bg-brand-cream transition-colors text-brand-brown"
+                            title="Go back"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <div>
+                            <h1 className="text-xl sm:text-2xl font-extrabold text-brand-black tracking-tight">Order Tracking</h1>
+                            <p className="text-xs text-brand-brown/60 font-mono font-medium">#{order.id.slice(0, 8)}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className={`text-xs font-extrabold px-3 py-1 rounded-xl border ${
+                            isCompleted
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-amber-50 text-amber-800 border-amber-200'
+                        }`}>
+                            {isCompleted ? 'Completed' : 'In Progress'}
+                        </span>
                     </div>
                 </div>
 
                 {/* Days Left Hero Section */}
                 {!isCompleted && daysLeft !== null && (
-                    <div className="bg-brand-brown text-white p-8 rounded-3xl shadow-xl text-center relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <div className="bg-brand-brown text-white p-6 sm:p-8 rounded-3xl shadow-sm border border-brand-brown/20 text-center relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
                             <Clock className="w-40 h-40" />
                         </div>
                         <div className="relative z-10">
-                            <div className="text-sm font-bold opacity-80 uppercase mb-1">Estimated Completion</div>
-                            <div className="text-6xl font-extrabold mb-2">{Math.max(0, daysLeft)}</div>
-                            <div className="text-xl font-medium opacity-80">{Math.max(0, daysLeft) === 1 ? 'Day' : 'Days'} Remaining</div>
-                            <div className="mt-4 inline-flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full text-sm">
-                                <Calendar className="w-4 h-4" />
-                                {completionDate ? completionDate.toLocaleDateString() : 'Date pending'}
+                            <div className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Estimated Completion</div>
+                            <div className="text-5xl sm:text-6xl font-black mb-1">{Math.max(0, daysLeft)}</div>
+                            <div className="text-sm sm:text-base font-semibold text-white/80">{Math.max(0, daysLeft) === 1 ? 'Day Remaining' : 'Days Remaining'}</div>
+                            <div className="mt-4 inline-flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-xl text-xs font-bold backdrop-blur-xs">
+                                <Calendar className="w-4 h-4 text-brand-orange" />
+                                <span>Target: {completionDate ? completionDate.toLocaleDateString() : 'Date pending'}</span>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Tracking Stepper */}
-                <div className="bg-white rounded-3xl p-8 shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white">
-                    <h2 className="text-xl font-extrabold text-brand-black mb-8 flex items-center gap-3">
-                        <div className="p-2 bg-brand-green/10 rounded-xl text-brand-green">
-                            <Truck className="w-6 h-6" />
+                {/* Live Tracking Card */}
+                <div className="bg-white rounded-3xl p-6 sm:p-8 border border-brand-brown/10 shadow-xs relative overflow-hidden">
+                    {/* Header & Status Bar */}
+                    <div className="space-y-4 pb-6 border-b border-brand-brown/10">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-extrabold shadow-2xs">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                                    Live Status
+                                </span>
+                                <h2 className="text-lg sm:text-xl font-extrabold text-brand-black tracking-tight">
+                                    {activeStage.label}
+                                </h2>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-extrabold text-brand-brown/60">
+                                    Stage {currentStageIdx + 1} of {TRACKING_STAGES.length}
+                                </span>
+                                <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-brand-cream border border-brand-brown/15 text-brand-black font-mono">
+                                    {progressPercent}%
+                                </span>
+                            </div>
                         </div>
-                        Live Tracking
-                    </h2>
 
-                    <div className="relative pl-2">
-                        {/* Vertical Line */}
-                        <div className="absolute left-[1.15rem] top-4 bottom-4 w-0.5 bg-gray-100" />
+                        {/* Animated Gradient Progress Meter */}
+                        <div className="space-y-1.5">
+                            <div className="h-3 w-full bg-brand-cream/70 rounded-full overflow-hidden p-0.5 border border-brand-brown/10">
+                                <div
+                                    className="h-full rounded-full bg-gradient-to-r from-brand-orange via-amber-500 to-emerald-500 transition-all duration-1000 shadow-xs"
+                                    style={{ width: `${Math.max(5, progressPercent)}%` }}
+                                />
+                            </div>
+                            <p className="text-xs text-brand-brown/60 font-medium leading-relaxed">
+                                {activeStage.description}
+                            </p>
+                        </div>
+                    </div>
 
-                        <div className="space-y-8">
+                    {/* Horizontal Milestone Tracker (Desktop / Tablet) */}
+                    <div className="hidden md:block py-6 border-b border-brand-brown/10">
+                        <div className="relative flex items-center justify-between px-2">
+                            {/* Background Track Line */}
+                            <div className="absolute left-6 right-6 top-5 h-1 bg-brand-brown/10 -translate-y-1/2 rounded-full -z-0" />
+                            {/* Active Progress Line */}
+                            <div
+                                className="absolute left-6 top-5 h-1 bg-gradient-to-r from-brand-orange to-emerald-500 -translate-y-1/2 rounded-full transition-all duration-700 -z-0"
+                                style={{
+                                    width: `calc(${progressPercent}% - 3rem * ${(100 - progressPercent) / 100})`
+                                }}
+                            />
+
                             {TRACKING_STAGES.map((stage, idx) => {
                                 const isPassed = currentStageIdx >= idx;
                                 const isCurrent = currentStageIdx === idx;
-                                const isCompletedStep = currentStageIdx > idx; // Strictly passed
-
-                                // Find timestamp from history if available
-                                const historyItem = order.projectMeta?.trackingHistory?.find(h => h.stage === stage.id);
+                                const isStepCompleted = currentStageIdx > idx;
 
                                 return (
-                                    <div key={stage.id} className={`relative flex items-start gap-5 group ${isPassed ? 'opacity-100' : 'opacity-40'}`}>
-
-                                        {/* Icon Container */}
-                                        <div className={`relative z-10 flex items-center justify-center transition-all duration-500 rounded-2xl border-2 shrink-0
-                                            ${isCurrent
-                                                ? 'w-14 h-14 bg-white border-brand-orange text-brand-orange shadow-xl scale-110 ring-4 ring-brand-orange/10'
-                                                : isCompletedStep
-                                                    ? 'w-12 h-12 bg-white border-brand-green text-brand-green shadow-md'
-                                                    : 'w-12 h-12 bg-white border-gray-100 text-gray-300'
-                                            }
-                                        `}>
-                                            <stage.icon className={`transition-all ${isCurrent ? 'w-6 h-6 animate-pulse' : 'w-5 h-5'}`} />
-
-                                            {/* Completed Badge - Green Check */}
-                                            {isCompletedStep && (
-                                                <div className="absolute -right-1 -top-1 w-5 h-5 bg-brand-green text-white rounded-full flex items-center justify-center shadow-sm border-2 border-white">
-                                                    <CheckCircle className="w-3 h-3" />
-                                                </div>
-                                            )}
-
-                                            {/* Pulse Ring for Active State */}
-                                            {isCurrent && (
-                                                <span className="absolute inline-flex h-full w-full rounded-2xl bg-brand-orange opacity-20 animate-ping"></span>
+                                    <div key={stage.id} className="flex flex-col items-center gap-2 relative z-10 w-20">
+                                        <div
+                                            className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                                                isStepCompleted
+                                                    ? 'bg-emerald-500 text-white shadow-xs border-2 border-emerald-500'
+                                                    : isCurrent
+                                                        ? 'bg-white text-emerald-600 border-2 border-emerald-500 shadow-md ring-4 ring-emerald-500/15 scale-110'
+                                                        : 'bg-brand-cream/50 text-brand-brown/30 border border-brand-brown/15'
+                                            }`}
+                                        >
+                                            {isStepCompleted ? (
+                                                <CheckCircle className="w-5 h-5" />
+                                            ) : (
+                                                <stage.icon className={`w-4 h-4 ${isCurrent ? 'animate-pulse' : ''}`} />
                                             )}
                                         </div>
-
-                                        <div className={`flex-1 pt-1.5 transition-all duration-300 ${isCurrent ? 'translate-x-2' : ''}`}>
-                                            <h3 className={`font-bold text-base flex items-center gap-2 ${isCurrent ? 'text-brand-orange text-lg' : isPassed ? 'text-brand-green' : 'text-gray-400'}`}>
-                                                {stage.label}
-                                            </h3>
-
-                                            {/* Show status description or timestamp */}
-                                            {historyItem ? (
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <div className={`h-1.5 w-1.5 rounded-full ${isPassed ? 'bg-brand-green' : 'bg-gray-300'}`}></div>
-                                                    <p className="text-xs text-brand-brown/60 font-bold">
-                                                        {historyItem.timestamp?.toDate ? historyItem.timestamp.toDate().toLocaleString() : new Date(historyItem.timestamp).toLocaleString()}
-                                                    </p>
-                                                </div>
-                                            ) : isCurrent ? (
-                                                <p className="text-xs text-brand-orange/80 font-bold mt-1 animate-pulse">
-                                                    Processing Now...
-                                                </p>
-                                            ) : null}
-                                        </div>
+                                        <span className={`text-[10px] font-bold text-center leading-tight line-clamp-2 ${
+                                            isCurrent
+                                                ? 'text-brand-black font-extrabold'
+                                                : isPassed
+                                                    ? 'text-brand-brown/80'
+                                                    : 'text-brand-brown/40'
+                                        }`}>
+                                            {stage.short}
+                                        </span>
                                     </div>
-                                )
+                                );
                             })}
+                        </div>
+                    </div>
+
+                    {/* Detailed Vertical Status Feed */}
+                    <div className="pt-6">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-brand-brown/50 mb-6">
+                            Milestone Timeline
+                        </h3>
+
+                        <div className="relative pl-1">
+                            {/* Vertical Line Track */}
+                            <div className="absolute left-[19px] top-4 bottom-4 w-0.5 bg-brand-brown/10" />
+                            {/* Filled Vertical Line */}
+                            <div
+                                className="absolute left-[19px] top-4 w-0.5 bg-emerald-500 transition-all duration-700"
+                                style={{
+                                    height: `${(currentStageIdx / (TRACKING_STAGES.length - 1)) * 100}%`
+                                }}
+                            />
+
+                            <div className="space-y-6">
+                                {TRACKING_STAGES.map((stage, idx) => {
+                                    const isPassed = currentStageIdx >= idx;
+                                    const isCurrent = currentStageIdx === idx;
+                                    const isStepCompleted = currentStageIdx > idx;
+
+                                    // Check if stage timestamp exists in order history
+                                    const historyItem = order.projectMeta?.trackingHistory?.find(h => h.stage === stage.id);
+                                    let dateDisplay = null;
+                                    if (historyItem?.timestamp) {
+                                        const d = historyItem.timestamp?.toDate
+                                            ? historyItem.timestamp.toDate()
+                                            : new Date(historyItem.timestamp);
+                                        dateDisplay = d.toLocaleString(undefined, {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+                                    } else if (stage.id === 'requested' && order.createdAt) {
+                                        const d = order.createdAt?.toDate
+                                            ? order.createdAt.toDate()
+                                            : new Date(order.createdAt);
+                                        dateDisplay = d.toLocaleString(undefined, {
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+                                    }
+
+                                    return (
+                                        <div
+                                            key={stage.id}
+                                            className={`relative flex items-start gap-4 transition-opacity duration-300 ${
+                                                isPassed ? 'opacity-100' : 'opacity-40'
+                                            }`}
+                                        >
+                                            {/* Step Circle Node */}
+                                            <div
+                                                className={`relative z-10 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all ${
+                                                    isStepCompleted
+                                                        ? 'bg-emerald-500 text-white shadow-xs border-2 border-emerald-500'
+                                                        : isCurrent
+                                                            ? 'bg-white text-emerald-600 border-2 border-emerald-500 shadow-md ring-4 ring-emerald-500/15'
+                                                            : 'bg-brand-cream/60 text-brand-brown/30 border border-brand-brown/15'
+                                                }`}
+                                            >
+                                                {isStepCompleted ? (
+                                                    <CheckCircle className="w-5 h-5" />
+                                                ) : (
+                                                    <stage.icon className={`w-4 h-4 ${isCurrent ? 'animate-pulse' : ''}`} />
+                                                )}
+                                            </div>
+
+                                            {/* Step Content */}
+                                            <div className="flex-1 min-w-0 bg-[#FAF8F5]/80 hover:bg-[#FAF8F5] p-3.5 rounded-2xl border border-brand-brown/10 transition-colors">
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className={`text-sm font-bold ${
+                                                            isCurrent ? 'text-brand-black' : isPassed ? 'text-brand-brown' : 'text-brand-brown/50'
+                                                        }`}>
+                                                            {stage.label}
+                                                        </h4>
+                                                        {isCurrent && (
+                                                            <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+                                                                Active Now
+                                                            </span>
+                                                        )}
+                                                        {isStepCompleted && (
+                                                            <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                                Completed
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {dateDisplay && (
+                                                        <span className="text-[11px] font-medium text-brand-brown/60 shrink-0">
+                                                            {dateDisplay}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                <p className="text-xs text-brand-brown/70 font-medium leading-relaxed">
+                                                    {stage.description}
+                                                </p>
+
+                                                {isCurrent && (
+                                                    <div className="mt-2 text-xs font-semibold text-emerald-700 flex items-center gap-1.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                                                        <span>Processing on schedule</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -348,11 +572,19 @@ export default function OrderDetails() {
                         </h2>
                         {vendor ? (
                             <div className="text-center relative">
-                                <div className="w-20 h-20 bg-brand-cream rounded-full flex items-center justify-center mx-auto mb-4 text-brand-brown font-black text-2xl shadow-inner border-4 border-white">
-                                    {vendor.name?.[0] || 'V'}
-                                </div>
-                                <h3 className="font-black text-2xl text-brand-black mb-1">{vendor.businessName || vendor.name}</h3>
-                                <div className="flex justify-center gap-2 mb-6">
+                                <Link
+                                    to={`/vendors/${vendor.id}`}
+                                    className="block group"
+                                    title="View Vendor Profile & Orders"
+                                >
+                                    <div className="w-20 h-20 bg-brand-cream rounded-full flex items-center justify-center mx-auto mb-4 text-brand-brown font-black text-2xl shadow-inner border-4 border-white group-hover:scale-105 transition-transform">
+                                        {vendor.name?.[0] || 'V'}
+                                    </div>
+                                    <h3 className="font-black text-2xl text-brand-black mb-1 group-hover:text-brand-orange transition-colors flex items-center justify-center gap-1.5">
+                                        <span>{vendor.businessName || vendor.name}</span>
+                                    </h3>
+                                </Link>
+                                <div className="flex justify-center gap-2 mb-4">
                                     <div className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-black flex items-center gap-1">
                                         <Star className="w-3 h-3 fill-current" />
                                         {vendor.rating ? vendor.rating.toFixed(2) : 'New'}
@@ -362,14 +594,23 @@ export default function OrderDetails() {
                                     </div>
                                 </div>
 
-                                {/* Chat Button */}
-                                <button
-                                    onClick={() => setShowChat(true)}
-                                    className="w-full mb-6 py-3 bg-brand-brown text-white rounded-xl font-bold shadow-lg hover:bg-brand-black transition-all flex items-center justify-center gap-2"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                                    Chat with Vendor
-                                </button>
+                                {/* Action Buttons */}
+                                <div className="space-y-2 mb-6">
+                                    <Link
+                                        to={`/vendors/${vendor.id}`}
+                                        className="w-full py-2.5 bg-brand-cream/80 hover:bg-brand-cream text-brand-brown border border-brand-brown/15 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs sm:text-sm"
+                                    >
+                                        <Store className="w-4 h-4" />
+                                        View Vendor Profile & Orders
+                                    </Link>
+                                    <button
+                                        onClick={() => setShowChat(true)}
+                                        className="w-full py-3 bg-brand-brown text-white rounded-xl font-bold shadow-md hover:bg-brand-black transition-all flex items-center justify-center gap-2 text-sm"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                                        Chat with Vendor
+                                    </button>
+                                </div>
 
                                 <div className="space-y-4 text-left bg-brand-cream/30 p-5 rounded-2xl border border-brand-brown/5">
                                     <div className="flex items-start gap-4">

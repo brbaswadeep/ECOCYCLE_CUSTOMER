@@ -13,57 +13,113 @@ export default function EcoBot() {
     const [isTyping, setIsTyping] = useState(false);
     const messagesEndRef = useRef(null);
     const { currentUser } = useAuth();
-
     const [isTawkReady, setIsTawkReady] = useState(false);
+
+    // Auto-scroll to bottom of bot chat
+    useEffect(() => {
+        if (mode === 'bot') {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages, mode, isOpen]);
+
+    // Helper to thoroughly hide Tawk widget and launcher bubble
+    const hideTawk = () => {
+        if (window.Tawk_API) {
+            try {
+                if (typeof window.Tawk_API.minimize === 'function') {
+                    window.Tawk_API.minimize();
+                }
+                if (typeof window.Tawk_API.hideWidget === 'function') {
+                    window.Tawk_API.hideWidget();
+                }
+            } catch (e) {
+                console.error("Error hiding Tawk:", e);
+            }
+            // Fallback intervals to prevent Tawk's post-minimize animation from re-displaying its bubble
+            setTimeout(() => {
+                try {
+                    if (window.Tawk_API && typeof window.Tawk_API.hideWidget === 'function') {
+                        window.Tawk_API.hideWidget();
+                    }
+                } catch (_) {}
+            }, 120);
+            setTimeout(() => {
+                try {
+                    if (window.Tawk_API && typeof window.Tawk_API.hideWidget === 'function') {
+                        window.Tawk_API.hideWidget();
+                    }
+                } catch (_) {}
+            }, 350);
+        }
+    };
 
     useEffect(() => {
         const checkTawk = setInterval(() => {
-            if (window.Tawk_API) {
+            if (window.Tawk_API && typeof window.Tawk_API.hideWidget === 'function') {
                 setIsTawkReady(true);
                 clearInterval(checkTawk);
 
+                // Ensure Tawk launcher is hidden initially
+                hideTawk();
+
                 window.Tawk_API.onChatMaximized = function () {
-                    setMode('support');
-                    if (!isOpen) setIsOpen(true);
+                    // Chat is opened
                 };
 
                 window.Tawk_API.onChatMinimized = function () {
+                    hideTawk();
+                    setIsOpen(true);
                     setMode('menu');
                 };
 
                 window.Tawk_API.onChatHidden = function () {
+                    hideTawk();
+                    setIsOpen(true);
+                    setMode('menu');
+                };
+
+                window.Tawk_API.onChatEnded = function () {
+                    hideTawk();
+                    setIsOpen(true);
                     setMode('menu');
                 };
             }
-        }, 1000);
+        }, 500);
 
         return () => clearInterval(checkTawk);
-    }, [isOpen]);
+    }, []);
 
     const toggleOpen = () => {
-        setIsOpen(!isOpen);
-        if (!isOpen) {
+        if (isOpen) {
+            hideTawk();
+            setIsOpen(false);
             setMode('menu');
-            if (window.Tawk_API) window.Tawk_API.minimize();
+        } else {
+            hideTawk();
+            setIsOpen(true);
+            setMode('menu');
         }
     };
 
     const handleOpenTawk = () => {
-        if (window.Tawk_API) {
-            setMode('support');
-            window.Tawk_API.showWidget();
-            window.Tawk_API.maximize();
+        if (window.Tawk_API && typeof window.Tawk_API.maximize === 'function') {
+            try {
+                window.Tawk_API.showWidget();
+                window.Tawk_API.maximize();
+                // Close EcoBot modal while chatting with team so they never overlap
+                setIsOpen(false);
+            } catch (err) {
+                console.error("Error opening Tawk:", err);
+            }
         } else {
             alert("Support chat is initializing. Please try again in a moment.");
         }
     };
 
     const handleBackToMenu = () => {
-        if (window.Tawk_API) {
-            window.Tawk_API.minimize();
-            // window.Tawk_API.hideWidget(); // Optional: hide if you want it gone completely
-        }
+        hideTawk();
         setMode('menu');
+        setIsOpen(true);
     };
 
     const handleSendMessage = async (e) => {

@@ -13,6 +13,7 @@ import StoreOrderDetails from './pages/StoreOrderDetails';
 import Profile from './pages/Profile';
 import Messages from './pages/Messages';
 import Shop from './pages/Shop';
+import VendorProfile from './pages/VendorProfile';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import React, { useEffect } from 'react';
@@ -120,6 +121,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <StoreOrderDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vendors/:vendorId"
+              element={
+                <ProtectedRoute>
+                  <VendorProfile />
                 </ProtectedRoute>
               }
             />

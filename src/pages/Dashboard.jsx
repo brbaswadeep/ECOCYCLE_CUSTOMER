@@ -1,8 +1,12 @@
 import { useAuth } from '../context/AuthContext';
-import { BarChart3, Leaf, Recycle, MapPin, LogOut, User, Phone, Mail, X, Scan, DollarSign } from 'lucide-react';
+import { 
+    BarChart3, Leaf, Recycle, User, Phone, Mail, X, Scan, 
+    DollarSign, ArrowRight, Sparkles, ShoppingBag, Award, 
+    ExternalLink, ChevronRight, AlertCircle
+} from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth } from '../firebase';
 
 export default function Dashboard() {
@@ -30,14 +34,18 @@ export default function Dashboard() {
     }, [currentUser, db]);
 
     async function fetchUserData() {
-        const docRef = doc(db, "customers", currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            setUserData(data);
-            if (!data.phone) {
-                setShowPhoneModal(true);
+        try {
+            const docRef = doc(db, "customers", currentUser.uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setUserData(data);
+                if (!data.phone) {
+                    setShowPhoneModal(true);
+                }
             }
+        } catch (err) {
+            console.error("Error fetching user data:", err);
         }
     }
 
@@ -60,29 +68,21 @@ export default function Dashboard() {
                 requests.push({ id: doc.id, ...data });
                 totalItems += 1;
 
-                // Track Sold Items
                 if (data.itemDetails?.requestType === 'sell' && data.status === 'accepted') {
                     soldItems += 1;
-                    totalEarnings += (data.finalQuote?.finalVendorEarnings || data.itemDetails?.askingPrice || 0); // User earnings approx (in sell model, finalVendorEarnings in doc is actually Customer Earnings potentially if we inverted logic in vendor panel... wait, vendor panel code used finalVendorEarnings as what VENDOR gets. I need to be careful here. 
-                    // PROVISIONAL: For now, use itemDetails.askingPrice if sold. I will refine vendor panel to store 'customerEarnings' in finalQuote.)
-                    // Actually, let's assume askingPrice for now, or 0 if pending.
                     if (data.finalQuote?.customerEarnings) {
                         totalEarnings += data.finalQuote.customerEarnings;
                     } else {
-                        // Fallback for now until Vendor Panel is updated
                         totalEarnings += data.itemDetails?.askingPrice || 0;
                     }
-
                 }
 
-                // Aggregate real environmental impact data
                 if (data.itemDetails?.analysis?.environmental_impact) {
                     const impact = data.itemDetails.analysis.environmental_impact;
                     totalCO2 += impact.co2_saved_kg || impact.CO2_saved_kg || 0;
                 }
             });
 
-            // Sort by date desc
             requests.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
             setStats({
@@ -90,22 +90,13 @@ export default function Dashboard() {
                 itemsSold: soldItems,
                 earnings: totalEarnings,
                 co2Saved: totalCO2.toFixed(1),
-                points: totalItems * 50 // Mock: 50 pts per item
+                points: totalItems * 50
             });
 
             setRecentActivity(requests.slice(0, 5));
 
         } catch (error) {
             console.error("Error fetching stats:", error);
-        }
-    }
-
-    async function handleLogout() {
-        try {
-            await logout();
-            navigate('/');
-        } catch (error) {
-            console.error("Failed to log out", error);
         }
     }
 
@@ -126,45 +117,46 @@ export default function Dashboard() {
         setLoading(false);
     }
 
-    const statCards = [
-        { label: 'Items Recycled', value: stats.itemsRecycled, icon: <Recycle className="w-5 h-5 text-brand-red" />, change: 'Total Lifetime' },
-        { label: 'Sold Products', value: stats.itemsSold, icon: <DollarSign className="w-5 h-5 text-brand-green" />, change: `Earned ₹${stats.earnings}` },
-        { label: 'CO2 Saved', value: `${stats.co2Saved}kg`, icon: <Leaf className="w-5 h-5 text-brand-green" />, change: 'Estimated Impact' },
-        { label: 'Points Earned', value: stats.points, icon: <BarChart3 className="w-5 h-5 text-brand-brown" />, change: 'Redeemable Soon' },
-    ];
+    // Tier calculation based on eco-points
+    const userPoints = stats.points || 0;
+    const currentTier = userPoints >= 500 ? "Green Guardian" : userPoints >= 200 ? "Eco Advocate" : "Green Starter";
+    const nextTierTarget = userPoints >= 500 ? 1000 : userPoints >= 200 ? 500 : 200;
+    const tierProgress = Math.min(100, Math.round((userPoints / nextTierTarget) * 100));
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
             {/* Phone Number Modal */}
             {showPhoneModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 border border-brand-brown/10 relative">
                         <button
                             onClick={() => setShowPhoneModal(false)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-brand-red"
+                            className="absolute top-4 right-4 text-brand-brown/40 hover:text-brand-red transition-colors"
                         >
                             <X className="w-5 h-5" />
                         </button>
 
                         <div className="text-center mb-6">
-                            <div className="w-12 h-12 bg-brand-red/10 rounded-full flex items-center justify-center mx-auto mb-3 text-brand-red">
+                            <div className="w-12 h-12 bg-brand-red/10 rounded-2xl flex items-center justify-center mx-auto mb-3 text-brand-red">
                                 <Phone className="w-6 h-6" />
                             </div>
-                            <h2 className="text-xl font-bold text-brand-black">Complete Your Profile</h2>
-                            <p className="text-sm text-brand-brown/70 mt-1">Please provide your mobile number to continue.</p>
+                            <h2 className="text-xl font-bold text-brand-black">Link Mobile Number</h2>
+                            <p className="text-sm text-brand-brown/60 mt-1">Needed for coordinating waste pickups and quotes.</p>
                         </div>
 
-                        <form onSubmit={handleUpdatePhone}>
-                            <div className="mb-4">
-                                <label className="block text-xs font-bold text-brand-black mb-1.5 uppercase tracking-wide">Mobile Number <span className="text-brand-red">*</span></label>
+                        <form onSubmit={handleUpdatePhone} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-brand-brown mb-1.5 uppercase tracking-wide">
+                                    Mobile Number <span className="text-brand-red">*</span>
+                                </label>
                                 <div className="relative">
                                     <input
                                         type="tel"
                                         required
                                         value={newPhone}
                                         onChange={(e) => setNewPhone(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-brand-red focus:ring-1 focus:ring-brand-red text-brand-black placeholder-gray-400 transition-colors"
-                                        placeholder="+1 (555) 000-0000"
+                                        className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-brand-brown/15 rounded-xl focus:outline-none focus:border-brand-brown focus:ring-1 focus:ring-brand-brown text-brand-black placeholder-gray-400 text-sm font-medium transition-colors"
+                                        placeholder="+91 98765 43210"
                                     />
                                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 </div>
@@ -172,7 +164,7 @@ export default function Dashboard() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-3 bg-brand-red text-white font-bold rounded-xl hover:bg-brand-brown transition-all disabled:opacity-70"
+                                className="w-full py-3 bg-brand-brown text-white font-bold rounded-xl hover:bg-brand-black transition-all disabled:opacity-50 text-sm shadow-sm"
                             >
                                 {loading ? 'Saving...' : 'Save Mobile Number'}
                             </button>
@@ -181,113 +173,316 @@ export default function Dashboard() {
                 </div>
             )}
 
-
-            {/* 3D "Frame" Aesthetics: Soft Shadows & Rounded Elements */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] shadow-[8px_8px_16px_rgba(0,0,0,0.05),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white">
-                <div>
-                    <h1 className="text-3xl font-extrabold text-brand-black tracking-tight">
-                        Hi, <span className="text-brand-red inline-block hover:animate-pulse cursor-default">{userData?.name || currentUser?.displayName || 'EcoWarrior'}</span>! 👋
+            {/* 1. Header Banner */}
+            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-brand-brown/10 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="space-y-1">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-brand-black tracking-tight">
+                        Hi, <span className="text-brand-brown">{userData?.name || currentUser?.displayName || 'EcoWarrior'}</span>! 👋
                     </h1>
-                    <p className="text-brand-brown font-medium opacity-60 mt-1">Ready to make the world greener today?</p>
+                    <p className="text-sm sm:text-base text-brand-brown/70 font-medium">
+                        Track your recycling progress, earnings, and positive carbon impact.
+                    </p>
                 </div>
-                <Link to="/smart-scan" className="px-8 py-4 bg-gradient-to-r from-brand-red to-brand-orange text-white font-bold rounded-2xl shadow-[4px_4px_10px_rgba(234,67,53,0.3)] hover:shadow-[6px_6px_15px_rgba(234,67,53,0.4)] transition-all hover:-translate-y-1 active:scale-95 flex items-center gap-2">
-                    <Scan className="w-5 h-5 animate-bounce-slow" />
-                    Start Smart Scan
-                </Link>
+
+                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <Link
+                        to="/smart-scan"
+                        className="flex-1 md:flex-none px-6 py-3.5 bg-brand-red hover:bg-[#c94328] text-white font-bold rounded-xl text-sm transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
+                    >
+                        <Scan className="w-4 h-4" />
+                        Smart Scan
+                    </Link>
+                    <Link
+                        to="/shop"
+                        className="flex-1 md:flex-none px-6 py-3.5 bg-brand-cream hover:bg-brand-brown hover:text-white text-brand-brown font-bold rounded-xl text-sm transition-all border border-brand-brown/10 flex items-center justify-center gap-2"
+                    >
+                        <ShoppingBag className="w-4 h-4" />
+                        EcoShop
+                    </Link>
+                </div>
             </div>
 
-            {/* Profile Card & Stats Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Profile Card - Cute 3D Style */}
-                <div className="bg-white p-8 rounded-[2rem] shadow-[10px_10px_20px_rgba(0,0,0,0.03),-10px_-10px_20px_rgba(255,255,255,0.8)] border border-white flex flex-col justify-center relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-cream rounded-bl-full -mr-10 -mt-10 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-
-                    <div className="flex items-center gap-6 mb-8 relative z-10">
-                        <div className="w-24 h-24 bg-brand-cream rounded-full flex items-center justify-center border-4 border-white shadow-md text-brand-brown font-bold text-3xl transform group-hover:rotate-6 transition-transform duration-300">
-                            {userData?.name?.[0] || <User className="w-10 h-10" />}
+            {/* 2. Key Metrics Grid (4 Balanced Cards) */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                {/* Items Recycled */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-brand-brown/10 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="w-11 h-11 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center">
+                            <Recycle className="w-5 h-5" />
                         </div>
-                        <div>
-                            <h3 className="font-extrabold text-xl text-brand-black">{userData?.name || 'User Name'}</h3>
-                            <span className="inline-block px-4 py-1.5 bg-brand-green/10 text-brand-green text-xs font-bold rounded-full uppercase tracking-wide mt-2 shadow-sm">
-                                {userData?.role || 'EcoWarrior'}
-                            </span>
-                        </div>
+                        <span className="text-xs font-semibold text-brand-brown/40">
+                            Lifetime
+                        </span>
                     </div>
+                    <div className="text-2xl sm:text-3xl font-extrabold text-brand-black tracking-tight mb-1">
+                        {stats.itemsRecycled}
+                    </div>
+                    <div className="text-xs sm:text-sm font-bold text-brand-brown/70">
+                        Items Recycled
+                    </div>
+                </div>
 
-                    <div className="space-y-4 pt-6 border-t border-brand-brown/5 relative z-10">
-                        <div className="flex items-center gap-4 text-sm text-brand-brown font-bold">
-                            <div className="p-2.5 bg-brand-cream rounded-xl shadow-sm text-brand-red"><Mail className="w-4 h-4" /></div>
-                            <span className="truncate opacity-80">{userData?.email || currentUser?.email}</span>
+                {/* Earnings */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-brand-brown/10 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="w-11 h-11 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center">
+                            <DollarSign className="w-5 h-5" />
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-brand-brown font-bold">
-                            <div className="p-2.5 bg-brand-cream rounded-xl shadow-sm text-brand-red"><Phone className="w-4 h-4" /></div>
-                            <span className="opacity-80">{userData?.phone || 'No phone linked'}</span>
-                            {!userData?.phone && (
-                                <button onClick={() => setShowPhoneModal(true)} className="text-xs text-brand-red font-extrabold underline decoration-2 ml-auto hover:text-brand-orange">
-                                    Link Now
-                                </button>
+                        <span className="text-xs font-semibold text-brand-green">
+                            {stats.itemsSold} Sold
+                        </span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-extrabold text-brand-black tracking-tight mb-1">
+                        ₹{stats.earnings}
+                    </div>
+                    <div className="text-xs sm:text-sm font-bold text-brand-brown/70">
+                        Waste Earnings
+                    </div>
+                </div>
+
+                {/* CO2 Saved */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-brand-brown/10 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <Leaf className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-semibold text-emerald-600">
+                            Impact
+                        </span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-extrabold text-brand-black tracking-tight mb-1">
+                        {stats.co2Saved} <span className="text-base font-semibold text-brand-brown/60">kg</span>
+                    </div>
+                    <div className="text-xs sm:text-sm font-bold text-brand-brown/70">
+                        CO₂ Prevented
+                    </div>
+                </div>
+
+                {/* Points */}
+                <div className="bg-white rounded-2xl p-5 sm:p-6 border border-brand-brown/10 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="w-11 h-11 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <Award className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-semibold text-amber-600">
+                            Rewards
+                        </span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-extrabold text-brand-black tracking-tight mb-1">
+                        {stats.points}
+                    </div>
+                    <div className="text-xs sm:text-sm font-bold text-brand-brown/70">
+                        Eco-Points
+                    </div>
+                </div>
+            </div>
+
+            {/* 3. Main Dashboard Sections */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                
+                {/* Left (2 Columns): Recent Activity */}
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-white rounded-2xl border border-brand-brown/10 p-6 sm:p-8 shadow-sm">
+                        <div className="flex items-center justify-between mb-6 pb-4 border-b border-brand-brown/5">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-brand-cream rounded-xl text-brand-brown">
+                                    <Recycle className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg sm:text-xl font-bold text-brand-black">Recent Activity</h2>
+                                    <p className="text-xs text-brand-brown/60">Your latest recycling & sell requests</p>
+                                </div>
+                            </div>
+                            <Link 
+                                to="/history" 
+                                className="text-xs sm:text-sm font-bold text-brand-brown hover:text-brand-red flex items-center gap-1 transition-colors group"
+                            >
+                                View All 
+                                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                            </Link>
+                        </div>
+
+                        <div className="space-y-3">
+                            {recentActivity.length > 0 ? (
+                                recentActivity.map((item) => {
+                                    const status = item.status || 'pending';
+                                    const isAccepted = status === 'accepted';
+                                    const isRejected = status === 'rejected';
+
+                                    return (
+                                        <div 
+                                            key={item.id} 
+                                            onClick={() => navigate(`/orders/${item.id}`)}
+                                            className="flex items-center justify-between p-4 rounded-xl border border-brand-brown/5 hover:border-brand-brown/20 bg-brand-cream/15 hover:bg-white transition-all cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-4 min-w-0">
+                                                <div className="w-11 h-11 rounded-xl bg-white border border-brand-brown/10 flex items-center justify-center text-brand-brown group-hover:scale-105 transition-transform flex-shrink-0">
+                                                    {item.itemDetails?.material === 'Plastic' ? <Recycle className="w-5 h-5 text-brand-red" /> : <Leaf className="w-5 h-5 text-brand-green" />}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-brand-black text-sm sm:text-base truncate group-hover:text-brand-red transition-colors">
+                                                        {item.itemName || item.itemDetails?.goal || 'Recycled Item'}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mt-0.5 text-xs text-brand-brown/50">
+                                                        <span>
+                                                            {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : 'Recent'}
+                                                        </span>
+                                                        <span>•</span>
+                                                        <span className="capitalize">{item.itemDetails?.requestType || 'Recycle'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3 flex-shrink-0">
+                                                <span className={`px-2 py-0.5 rounded text-xs font-bold capitalize ${
+                                                    isAccepted ? 'text-green-700 bg-green-50' :
+                                                    isRejected ? 'text-red-700 bg-red-50' :
+                                                    'text-amber-700 bg-amber-50'
+                                                }`}>
+                                                    {status}
+                                                </span>
+                                                <span className="text-xs font-bold text-brand-green hidden sm:inline-block">
+                                                    +50 pts
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="text-center py-12 px-4 rounded-xl border-2 border-dashed border-brand-brown/10 bg-brand-cream/20">
+                                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mx-auto mb-3 text-brand-brown/40 border border-brand-brown/10">
+                                        <Scan className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="font-bold text-brand-black text-sm mb-1">No Activity Found</h3>
+                                    <p className="text-xs text-brand-brown/60 max-w-sm mx-auto mb-4">
+                                        Start your green journey today! Scan waste items to calculate their value and recycle them.
+                                    </p>
+                                    <Link 
+                                        to="/smart-scan"
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-brand-brown text-white font-bold rounded-lg text-xs hover:bg-brand-black transition-colors"
+                                    >
+                                        <Scan className="w-3.5 h-3.5" /> Start Your First Scan
+                                    </Link>
+                                </div>
                             )}
                         </div>
                     </div>
-                </div>
 
-                {/* Stats - Cute Cards */}
-                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    {statCards.map((stat, i) => (
-                        <div key={i} className="bg-white p-6 rounded-[2rem] shadow-[8px_8px_16px_rgba(0,0,0,0.03),-8px_-8px_16px_rgba(255,255,255,0.8)] border border-white hover:-translate-y-2 transition-transform duration-300 group cursor-default">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className={`p-4 rounded-2xl shadow-inner ${i === 0 ? 'bg-brand-red/10 text-brand-red' : i === 1 ? 'bg-brand-green/10 text-brand-green' : 'bg-brand-brown/10 text-brand-brown'}`}>
-                                    {stat.icon}
-                                </div>
-                                <span className="text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wide bg-gray-50 text-gray-400">
-                                    {stat.change}
-                                </span>
+                    {/* Quick Features Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Link 
+                            to="/smart-scan" 
+                            className="bg-white p-5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex items-start gap-4"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <Scan className="w-5 h-5" />
                             </div>
-                            <div className="text-4xl font-black text-brand-black mb-2 tracking-tight group-hover:scale-105 transition-transform origin-left">{stat.value}</div>
-                            <div className="text-xs text-brand-brown/50 font-extrabold uppercase tracking-widest">{stat.label}</div>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-brand-black text-sm group-hover:text-brand-red transition-colors flex items-center gap-1">
+                                    AI Waste Identifier <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </h4>
+                                <p className="text-xs text-brand-brown/60 mt-1 leading-relaxed">
+                                    Upload photos of recyclables to identify materials and estimate market value.
+                                </p>
+                            </div>
+                        </Link>
+
+                        <Link 
+                            to="/shop" 
+                            className="bg-white p-5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex items-start gap-4"
+                        >
+                            <div className="w-10 h-10 rounded-xl bg-brand-orange/15 text-brand-brown flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <ShoppingBag className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-brand-black text-sm group-hover:text-brand-brown transition-colors flex items-center gap-1">
+                                    EcoShop Marketplace <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </h4>
+                                <p className="text-xs text-brand-brown/60 mt-1 leading-relaxed">
+                                    Browse handcrafted goods and planters made from 100% reclaimed waste.
+                                </p>
+                            </div>
+                        </Link>
+                    </div>
+                </div>
+
+                {/* Right (1 Column): Profile Card & Eco Impact Summary */}
+                <div className="space-y-6">
+                    {/* Profile Card */}
+                    <div className="bg-white rounded-2xl border border-brand-brown/10 p-6 shadow-sm">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-16 h-16 rounded-full bg-brand-brown text-white flex items-center justify-center font-extrabold text-2xl shadow-sm flex-shrink-0">
+                                {userData?.name?.[0]?.toUpperCase() || currentUser?.displayName?.[0]?.toUpperCase() || <User className="w-8 h-8" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="font-extrabold text-lg text-brand-black truncate">
+                                    {userData?.name || currentUser?.displayName || 'EcoWarrior'}
+                                </h3>
+                                <p className="text-xs font-bold text-brand-green mt-0.5 tracking-wide">
+                                    {userData?.role || 'EcoWarrior'}
+                                </p>
+                            </div>
                         </div>
-                    ))}
-                </div>
-            </div>
 
-            {/* Recent Activity - Cute List */}
-            <div className="bg-white rounded-[2.5rem] shadow-[12px_12px_24px_rgba(0,0,0,0.04),-12px_-12px_24px_rgba(255,255,255,0.9)] border border-white p-8">
-                <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-2xl font-extrabold text-brand-black flex items-center gap-3">
-                        <div className="p-2 bg-brand-brown/10 rounded-xl text-brand-brown"><Recycle className="w-6 h-6" /></div>
-                        Recent Activity
-                    </h2>
-                    <Link to="/history" className="px-4 py-2 bg-brand-cream text-brand-brown font-bold rounded-xl text-sm hover:bg-brand-brown hover:text-white transition-colors">View All</Link>
-                </div>
-
-                <div className="space-y-4">
-                    {recentActivity.length > 0 ? (
-                        recentActivity.map((item) => (
-                            <div key={item.id} className="flex items-center gap-6 p-5 rounded-3xl border-2 border-transparent hover:border-brand-cream hover:bg-brand-cream/30 transition-all cursor-pointer group" onClick={() => navigate(`/orders/${item.id}`)}>
-                                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-brand-brown shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-transform border border-brand-brown/5">
-                                    {item.itemDetails?.material === 'Plastic' ? <Recycle className="w-7 h-7" /> : <Leaf className="w-7 h-7" />}
+                        {/* Contact Details */}
+                        <div className="space-y-3 pt-4 border-t border-brand-brown/10 text-xs font-medium text-brand-brown">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-brand-cream rounded-lg text-brand-brown">
+                                    <Mail className="w-3.5 h-3.5" />
                                 </div>
-                                <div className="flex-1">
-                                    <div className="font-extrabold text-brand-black text-lg group-hover:text-brand-red transition-colors">{item.itemName || 'Recycled Item'}</div>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-brand-green"></div>
-                                        <div className="text-xs text-brand-brown/60 font-bold uppercase tracking-wide">
-                                            {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : 'Just now'} • {item.status}
-                                        </div>
+                                <span className="truncate">{userData?.email || currentUser?.email}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="p-2 bg-brand-cream rounded-lg text-brand-brown">
+                                        <Phone className="w-3.5 h-3.5" />
                                     </div>
+                                    <span className="truncate">{userData?.phone || 'No phone linked'}</span>
                                 </div>
-                                <div className="font-black text-brand-green bg-white shadow-sm px-4 py-2 rounded-xl border border-brand-green/10 group-hover:bg-brand-green group-hover:text-white transition-colors">+50 pts</div>
+                                {!userData?.phone && (
+                                    <button 
+                                        onClick={() => setShowPhoneModal(true)}
+                                        className="text-xs font-bold text-brand-red hover:underline flex-shrink-0"
+                                    >
+                                        Link
+                                    </button>
+                                )}
                             </div>
-                        ))
-                    ) : (
-                        <div className="text-center py-16 text-brand-brown/40 font-bold bg-brand-cream/20 rounded-3xl border-3 border-dashed border-brand-brown/5 flex flex-col items-center gap-4">
-                            <div className="w-20 h-20 bg-brand-cream rounded-full flex items-center justify-center opacity-50 animate-bounce">
-                                <Scan className="w-8 h-8" />
-                            </div>
-                            No recent activity found. <br /> Start your first scan today!
                         </div>
-                    )}
+
+                        {/* Impact Level Progress */}
+                        <div className="mt-6 pt-5 border-t border-brand-brown/10">
+                            <div className="flex justify-between items-center text-xs mb-2 font-bold">
+                                <span className="text-brand-black">{currentTier}</span>
+                                <span className="text-brand-green font-extrabold">{userPoints} pts</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-brand-green rounded-full transition-all duration-700" 
+                                    style={{ width: `${tierProgress}%` }}
+                                />
+                            </div>
+                            <div className="flex justify-between text-[11px] text-brand-brown/50 mt-1.5 font-medium">
+                                <span>Level Progress</span>
+                                <span>{nextTierTarget - userPoints > 0 ? `${nextTierTarget - userPoints} pts to next tier` : 'Top Tier!'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Green Tip Card */}
+                    <div className="bg-emerald-50/70 rounded-2xl border border-emerald-200/60 p-5 text-emerald-950">
+                        <div className="flex items-center gap-2.5 mb-2">
+                            <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+                                <Leaf className="w-4 h-4" />
+                            </div>
+                            <h4 className="font-bold text-sm text-emerald-900">Eco Fact of the Day</h4>
+                        </div>
+                        <p className="text-xs text-emerald-800/90 leading-relaxed">
+                            Recycling 1 ton of plastic saves approximately 5,774 kWh of electricity and prevents 1.5 tons of carbon emissions.
+                        </p>
+                    </div>
                 </div>
+
             </div>
         </div>
     );

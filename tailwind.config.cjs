@@ -11,7 +11,7 @@ module.exports = {
                     red: '#E35336',    // Primary Action
                     cream: '#F5F5DC',  // Background
                     orange: '#F4A460', // Secondary
-                    brown: '#A0522D',  // Accent
+                    brown: '#5C2812',  // Accent (Darkened for better contrast)
                     black: '#000000',  // Text (Strict Black)
                     green: '#2E8B57',  // Success/Nature
                 }

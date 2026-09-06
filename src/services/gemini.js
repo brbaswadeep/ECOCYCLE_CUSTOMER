@@ -388,17 +388,14 @@ JSON STRUCTURE:
       return JSON.parse(text.substring(startIndex, endIndex + 1));
     } catch (error) {
       console.error(`Gemini Text Analysis Error (Attempt ${attempt + 1})`, error);
-      if (error.message.includes("429") || error.message.includes("503") || error.message.includes("403")) {
-        attempt++;
-        if (rotateKey()) {
-          console.log("Retrying text analysis with new key...");
-          continue;
-        }
-
-        if (attempt < maxRetries) {
-          await delay(2000 * Math.pow(2, attempt));
-          continue;
-        }
+      attempt++;
+      if (rotateKey()) {
+        console.log("Retrying text analysis with new Gemini key...");
+        continue;
+      }
+      if (attempt < maxRetries) {
+        await delay(1000 * Math.pow(2, attempt));
+        continue;
       }
       throw error;
     }
