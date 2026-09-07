@@ -6,13 +6,14 @@ import {
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, getDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { auth } from '../firebase';
 
 export default function Dashboard() {
     const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
     const [userData, setUserData] = useState(null);
+    const [wetWasteSub, setWetWasteSub] = useState(null);
     const [stats, setStats] = useState({
         itemsRecycled: 0,
         itemsSold: 0,
@@ -27,16 +28,10 @@ export default function Dashboard() {
     const db = getFirestore(auth.app);
 
     useEffect(() => {
-        if (currentUser) {
-            fetchUserData();
-            fetchUserStats();
-        }
-    }, [currentUser, db]);
+        if (!currentUser) return;
 
-    async function fetchUserData() {
-        try {
-            const docRef = doc(db, "customers", currentUser.uid);
-            const docSnap = await getDoc(docRef);
+        // 1. Live customer profile & EcoPoints listener
+        const unsubUser = onSnapshot(doc(db, "customers", currentUser.uid), (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setUserData(data);
@@ -44,10 +39,30 @@ export default function Dashboard() {
                     setShowPhoneModal(true);
                 }
             }
-        } catch (err) {
-            console.error("Error fetching user data:", err);
-        }
-    }
+        });
+
+        // 2. Live wet waste subscription listener
+        const subQuery = query(
+            collection(db, 'wet_waste_subscriptions'),
+            where('customerId', '==', currentUser.uid)
+        );
+        const unsubSub = onSnapshot(subQuery, (snapshot) => {
+            if (!snapshot.empty) {
+                const subs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                subs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                setWetWasteSub(subs[0]);
+            } else {
+                setWetWasteSub(null);
+            }
+        });
+
+        fetchUserStats();
+
+        return () => {
+            unsubUser();
+            unsubSub();
+        };
+    }, [currentUser, db]);
 
     async function fetchUserStats() {
         try {
@@ -187,14 +202,21 @@ export default function Dashboard() {
                 <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                     <Link
                         to="/smart-scan"
-                        className="flex-1 md:flex-none px-6 py-3.5 bg-brand-red hover:bg-[#c94328] text-white font-bold rounded-xl text-sm transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
+                        className="flex-1 md:flex-none px-5 py-3 bg-brand-red hover:bg-[#c94328] text-white font-bold rounded-xl text-sm transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
                     >
                         <Scan className="w-4 h-4" />
                         Smart Scan
                     </Link>
                     <Link
+                        to="/ecowaste"
+                        className="flex-1 md:flex-none px-5 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-sm transition-all shadow-sm hover:shadow flex items-center justify-center gap-2"
+                    >
+                        <Leaf className="w-4 h-4" />
+                        EcoWaste
+                    </Link>
+                    <Link
                         to="/shop"
-                        className="flex-1 md:flex-none px-6 py-3.5 bg-brand-cream hover:bg-brand-brown hover:text-white text-brand-brown font-bold rounded-xl text-sm transition-all border border-brand-brown/10 flex items-center justify-center gap-2"
+                        className="flex-1 md:flex-none px-5 py-3 bg-brand-cream hover:bg-brand-brown hover:text-white text-brand-brown font-bold rounded-xl text-sm transition-all border border-brand-brown/10 flex items-center justify-center gap-2"
                     >
                         <ShoppingBag className="w-4 h-4" />
                         EcoShop
@@ -280,9 +302,65 @@ export default function Dashboard() {
 
             {/* 3. Main Dashboard Sections */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                
-                {/* Left (2 Columns): Recent Activity */}
+                      {/* Left (2 Columns): Recent Activity & EcoWaste */}
                 <div className="lg:col-span-2 space-y-6">
+
+                    {/* EcoWaste Daily Wet Waste Status / Banner */}
+                    {wetWasteSub ? (
+                        <div className="bg-white rounded-2xl border border-brand-brown/10 p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0">
+                                    <Leaf className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-extrabold text-base text-brand-black">EcoWaste Daily Route</h3>
+                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                            wetWasteSub.status === 'paused' 
+                                                ? 'bg-amber-100 text-amber-800' 
+                                                : 'bg-emerald-100 text-emerald-800'
+                                        }`}>
+                                            {wetWasteSub.status === 'paused' ? 'Paused' : 'Active Pickup'}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-brand-brown/70 mt-0.5">
+                                        Slot: <strong className="text-brand-brown">{wetWasteSub.preferredSlot || 'Morning (7-9 AM)'}</strong> • Min: {wetWasteSub.thresholdKg || 2} kg @ ₹0.50/kg
+                                    </p>
+                                </div>
+                            </div>
+
+                            <Link
+                                to="/ecowaste"
+                                className="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition-colors flex items-center gap-1.5 flex-shrink-0"
+                            >
+                                <span>Manage Route</span>
+                                <ArrowRight size={13} />
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="bg-emerald-50/70 rounded-2xl border border-emerald-200/70 p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                                    <Leaf className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-sm text-emerald-950">Daily Wet Waste Pickups (₹0.50 / kg)</h3>
+                                    <p className="text-xs text-emerald-800/90 mt-0.5">
+                                        Sell fruit peels & kitchen waste daily. Threshold pickups by certified local vendors.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <Link
+                                to="/ecowaste"
+                                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1 flex-shrink-0"
+                            >
+                                <span>Start EcoWaste</span>
+                                <ArrowRight size={13} />
+                            </Link>
+                        </div>
+                    )}
+
                     <div className="bg-white rounded-2xl border border-brand-brown/10 p-6 sm:p-8 shadow-sm">
                         <div className="flex items-center justify-between mb-6 pb-4 border-b border-brand-brown/5">
                             <div className="flex items-center gap-3">
@@ -303,48 +381,59 @@ export default function Dashboard() {
                             </Link>
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="divide-y divide-brand-brown/5">
                             {recentActivity.length > 0 ? (
-                                recentActivity.map((item) => {
-                                    const status = item.status || 'pending';
-                                    const isAccepted = status === 'accepted';
-                                    const isRejected = status === 'rejected';
+                                recentActivity.map((activity) => {
+                                    const statusColors = {
+                                        pending: 'bg-amber-100 text-amber-800 border-amber-200',
+                                        accepted: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                                        rejected: 'bg-rose-100 text-rose-800 border-rose-200',
+                                        completed: 'bg-blue-100 text-blue-800 border-blue-200'
+                                    };
 
                                     return (
                                         <div 
-                                            key={item.id} 
-                                            onClick={() => navigate(`/orders/${item.id}`)}
-                                            className="flex items-center justify-between p-4 rounded-xl border border-brand-brown/5 hover:border-brand-brown/20 bg-brand-cream/15 hover:bg-white transition-all cursor-pointer group"
+                                            key={activity.id} 
+                                            onClick={() => navigate(`/history/${activity.id}`)}
+                                            className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-4 group cursor-pointer hover:bg-brand-cream/20 p-2 rounded-xl transition-all"
                                         >
-                                            <div className="flex items-center gap-4 min-w-0">
-                                                <div className="w-11 h-11 rounded-xl bg-white border border-brand-brown/10 flex items-center justify-center text-brand-brown group-hover:scale-105 transition-transform flex-shrink-0">
-                                                    {item.itemDetails?.material === 'Plastic' ? <Recycle className="w-5 h-5 text-brand-red" /> : <Leaf className="w-5 h-5 text-brand-green" />}
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-12 h-12 rounded-xl bg-brand-cream/50 border border-brand-brown/10 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                                    {activity.itemDetails?.imageUrl ? (
+                                                        <img 
+                                                            src={activity.itemDetails.imageUrl} 
+                                                            alt={activity.itemDetails.name} 
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        <Recycle className="w-6 h-6 text-brand-brown/40" />
+                                                    )}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="font-bold text-brand-black text-sm sm:text-base truncate group-hover:text-brand-red transition-colors">
-                                                        {item.itemName || item.itemDetails?.goal || 'Recycled Item'}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-0.5 text-xs text-brand-brown/50">
-                                                        <span>
-                                                            {item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : 'Recent'}
-                                                        </span>
+                                                    <h4 className="font-bold text-sm text-brand-black truncate group-hover:text-brand-brown transition-colors">
+                                                        {activity.itemDetails?.name || 'Recycling Request'}
+                                                    </h4>
+                                                    <div className="flex items-center gap-2 mt-0.5 text-xs text-brand-brown/60 font-medium">
+                                                        <span className="capitalize">{activity.itemDetails?.material || 'Mixed'}</span>
                                                         <span>•</span>
-                                                        <span className="capitalize">{item.itemDetails?.requestType || 'Recycle'}</span>
+                                                        <span>{activity.createdAt?.toDate ? activity.createdAt.toDate().toLocaleDateString() : 'Recent'}</span>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-3 flex-shrink-0">
-                                                <span className={`px-2 py-0.5 rounded text-xs font-bold capitalize ${
-                                                    isAccepted ? 'text-green-700 bg-green-50' :
-                                                    isRejected ? 'text-red-700 bg-red-50' :
-                                                    'text-amber-700 bg-amber-50'
-                                                }`}>
-                                                    {status}
+                                            <div className="text-right flex-shrink-0">
+                                                <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border capitalize ${statusColors[activity.status] || 'bg-gray-100 text-gray-700'}`}>
+                                                    {activity.status || 'Pending'}
                                                 </span>
-                                                <span className="text-xs font-bold text-brand-green hidden sm:inline-block">
-                                                    +50 pts
-                                                </span>
+                                                {activity.finalQuote?.customerEarnings ? (
+                                                    <div className="text-xs font-bold text-brand-green mt-1">
+                                                        +₹{activity.finalQuote.customerEarnings}
+                                                    </div>
+                                                ) : activity.itemDetails?.askingPrice ? (
+                                                    <div className="text-xs font-bold text-brand-brown mt-1">
+                                                        Est. ₹{activity.itemDetails.askingPrice}
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         </div>
                                     );
@@ -369,40 +458,57 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    {/* Quick Features Row */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Quick Features Row (3 Balanced Cards) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <Link 
                             to="/smart-scan" 
-                            className="bg-white p-5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex items-start gap-4"
+                            className="bg-white p-4.5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between"
                         >
-                            <div className="w-10 h-10 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <Scan className="w-5 h-5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-9 h-9 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                                    <Scan className="w-4.5 h-4.5" />
+                                </div>
                                 <h4 className="font-bold text-brand-black text-sm group-hover:text-brand-red transition-colors flex items-center gap-1">
-                                    AI Waste Identifier <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    SmartScan AI <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </h4>
-                                <p className="text-xs text-brand-brown/60 mt-1 leading-relaxed">
-                                    Upload photos of recyclables to identify materials and estimate market value.
-                                </p>
                             </div>
+                            <p className="text-xs text-brand-brown/60 leading-relaxed">
+                                AI photo scanner with 5-step cross-verification questionnaires.
+                            </p>
+                        </Link>
+
+                        <Link 
+                            to="/ecowaste" 
+                            className="bg-white p-4.5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between"
+                        >
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                                    <Leaf className="w-4.5 h-4.5" />
+                                </div>
+                                <h4 className="font-bold text-brand-black text-sm group-hover:text-emerald-800 transition-colors flex items-center gap-1">
+                                    EcoWaste Pickup <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </h4>
+                            </div>
+                            <p className="text-xs text-brand-brown/60 leading-relaxed">
+                                Daily wet waste doorstep collection @ ₹0.50/kg subscription.
+                            </p>
                         </Link>
 
                         <Link 
                             to="/shop" 
-                            className="bg-white p-5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex items-start gap-4"
+                            className="bg-white p-4.5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between"
                         >
-                            <div className="w-10 h-10 rounded-xl bg-brand-orange/15 text-brand-brown flex items-center justify-center group-hover:scale-110 transition-transform">
-                                <ShoppingBag className="w-5 h-5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-9 h-9 rounded-xl bg-brand-orange/15 text-brand-brown flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                                    <ShoppingBag className="w-4.5 h-4.5" />
+                                </div>
                                 <h4 className="font-bold text-brand-black text-sm group-hover:text-brand-brown transition-colors flex items-center gap-1">
-                                    EcoShop Marketplace <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    EcoShop Store <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </h4>
-                                <p className="text-xs text-brand-brown/60 mt-1 leading-relaxed">
-                                    Browse handcrafted goods and planters made from 100% reclaimed waste.
-                                </p>
                             </div>
+                            <p className="text-xs text-brand-brown/60 leading-relaxed">
+                                Handcrafted goods from makers with EcoPoints discounts.
+                            </p>
                         </Link>
                     </div>
                 </div>

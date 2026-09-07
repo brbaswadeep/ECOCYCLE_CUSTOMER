@@ -74,11 +74,10 @@ export default function Layout() {
                             icon={<Coins size={20} />} 
                             label="EcoPoints" 
                             active={location.pathname === '/ecopoints'} 
-                            badge={userEcoPoints > 0 ? `${userEcoPoints} pts` : null}
-                            badgeColor="bg-amber-600 text-white"
                         />
                         <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
                         <NavLink to="/history" icon={<History size={20} />} label="My Activity" active={location.pathname === '/history'} />
+                        <NavLink to="/ecowaste" icon={<Leaf size={20} />} label="EcoWaste" active={location.pathname === '/ecowaste'} />
                     </div>
 
                     {/* Smart Scan Card */}
@@ -145,11 +144,10 @@ export default function Layout() {
                                     icon={<Coins size={20} />} 
                                     label="EcoPoints" 
                                     active={location.pathname === '/ecopoints'} 
-                                    badge={userEcoPoints > 0 ? `${userEcoPoints} pts` : null}
-                                    badgeColor="bg-amber-600 text-white"
                                 />
                                 <NavLink to="/messages" icon={<MessageCircle size={20} />} label="Messages" active={location.pathname === '/messages'} badge={unreadCount} />
                                 <NavLink to="/history" icon={<History size={20} />} label="My Activity" active={location.pathname === '/history'} />
+                                <NavLink to="/ecowaste" icon={<Leaf size={20} />} label="EcoWaste" active={location.pathname === '/ecowaste'} />
                                 <NavLink to="/smart-scan" icon={<Scan size={20} />} label="Smart Scan" active={location.pathname === '/smart-scan'} />
                             </div>
                             <div className="pt-4 border-t border-brand-brown/10">

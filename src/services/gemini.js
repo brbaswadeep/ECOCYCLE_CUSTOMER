@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { checkHazardousWaste } from "../utils/hazardousCheck";
 
 const API_KEYS = [
   import.meta.env.VITE_GEMINI_API_KEY,
@@ -314,6 +315,16 @@ export async function analyzeWasteImage(base64Image) {
 }
 
 export async function generateIdeasFromText(nvidiaAnalysisText) {
+  // Pre-check for hazardous content
+  const hazCheck = checkHazardousWaste(nvidiaAnalysisText);
+  if (hazCheck) {
+    const err = new Error(hazCheck.reason);
+    err.isHazardous = true;
+    err.category = hazCheck.category;
+    err.guidance = hazCheck.guidance;
+    throw err;
+  }
+
   const maxRetries = 3;
   let attempt = 0;
 
@@ -321,6 +332,9 @@ export async function generateIdeasFromText(nvidiaAnalysisText) {
 You are a creative eco-friendly assistant.
 INPUT: Verified waste item details.
 TASK: Generate structured JSON with upcycling ideas & PRECISE PRICING.
+
+CRITICAL SAFETY RESTRICTION:
+Never suggest upcycling for hazardous materials, weapons, ammunition, explosives, fireworks, or medical biohazard waste. If any such item is indicated, you must output an error object.
 
 INPUT DETAILS:
 ${nvidiaAnalysisText}

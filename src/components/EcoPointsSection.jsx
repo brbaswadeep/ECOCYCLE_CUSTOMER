@@ -56,7 +56,7 @@ export default function EcoPointsSection({ showHeader = true, compact = false })
                         setEcoPoints(initialPoints);
                         setTotalEarned(initialPoints);
                         setTotalRedeemed(0);
-                    } catch (e) {
+                    } catch {
                         setEcoPoints(data.points || 0);
                         setTotalEarned(data.points || 0);
                     }
@@ -97,74 +97,71 @@ export default function EcoPointsSection({ showHeader = true, compact = false })
             {showHeader && (
                 <div className="flex items-center justify-between gap-4 pb-2 border-b border-brand-brown/10">
                     <div>
-                        <h1 className="text-2xl font-black text-brand-brown flex items-center gap-2">
-                            <Coins className="w-6 h-6 text-amber-600" />
+                        <h1 className="text-2xl font-black text-brand-black flex items-center gap-2">
+                            <Coins className="w-6 h-6 text-brand-orange" />
                             EcoPoints Wallet
                         </h1>
-                        <p className="text-xs text-brand-brown/60 mt-0.5">
-                            Earn points by recycling • Redeem exclusively for discounts in EcoShop
+                        <p className="text-xs text-brand-brown/70 mt-0.5">
+                            Earn points by recycling • Redeem exclusively for instant discounts in EcoShop
                         </p>
                     </div>
 
-                    <div className="px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-xs">
-                        <Sparkles size={14} className="text-emerald-600" />
+                    <div className="px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-emerald-700" />
                         <span>25 pts = ₹1</span>
                     </div>
                 </div>
             )}
 
-            {/* Modern Wallet Hero Card */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-brown via-[#3d190b] to-[#200b04] text-white p-6 sm:p-8 shadow-xl border border-brand-brown/20">
-                <div className="absolute top-0 right-0 w-80 h-80 bg-brand-orange/15 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-80 h-80 bg-brand-green/20 rounded-full blur-3xl pointer-events-none" />
-
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            {/* Flat Color Wallet Hero Card (Gradient-less, Crisp Plain Colors) */}
+            <div className="rounded-2xl bg-white text-brand-black p-6 sm:p-8 border border-brand-brown/15 shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     
                     {/* Left: Balance */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                            <span className="px-2.5 py-1 bg-white/10 rounded-lg text-xs font-bold text-brand-cream border border-white/15">
+                            <span className="px-2.5 py-1 bg-brand-cream rounded-lg text-xs font-bold text-brand-brown border border-brand-brown/15">
                                 Spendable Balance
                             </span>
-                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-lg text-[11px] font-bold border border-emerald-400/30">
+                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-200">
                                 EcoShop Exclusive
                             </span>
                         </div>
 
                         <div className="flex items-baseline gap-3">
-                            <span className="text-4xl sm:text-6xl font-black tracking-tight text-white">
+                            <span className="text-4xl sm:text-6xl font-black tracking-tight text-brand-black">
                                 {ecoPoints.toLocaleString()}
                             </span>
-                            <span className="text-base sm:text-xl font-bold text-brand-orange">
+                            <span className="text-base sm:text-xl font-extrabold text-brand-brown">
                                 EcoPoints
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-2 text-sm text-brand-cream/90">
-                            <span>Instant discount value:</span>
-                            <span className="text-xl font-black text-emerald-300">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand-cream/60 border border-brand-brown/10 text-sm">
+                            <span className="text-brand-brown/80 font-medium">Instant discount value:</span>
+                            <span className="text-lg font-black text-brand-green">
                                 ₹{rupeeDiscount} OFF
                             </span>
-                            <span className="text-xs text-brand-cream/60">(25 pts = ₹1)</span>
+                            <span className="text-xs text-brand-brown/60 font-semibold">(25 pts = ₹1)</span>
                         </div>
                     </div>
 
-                    {/* Right: Stats & Direct Action */}
-                    <div className="flex flex-col sm:flex-row md:flex-col gap-3 justify-end">
-                        <div className="grid grid-cols-2 gap-2 text-xs bg-black/25 p-3.5 rounded-2xl border border-white/10">
+                    {/* Right: Flat Stats & Action */}
+                    <div className="flex flex-col sm:flex-row md:flex-col gap-3 justify-end min-w-[240px]">
+                        <div className="grid grid-cols-2 gap-2 text-xs bg-brand-cream/40 p-3.5 rounded-xl border border-brand-brown/10">
                             <div>
-                                <div className="text-[10px] text-brand-cream/60 uppercase font-bold tracking-wider">All-Time Earned</div>
-                                <div className="text-sm font-extrabold text-white mt-0.5">{totalEarned.toLocaleString()} pts</div>
+                                <div className="text-[10px] text-brand-brown/60 uppercase font-bold tracking-wider">All-Time Earned</div>
+                                <div className="text-sm font-black text-brand-black mt-0.5">{totalEarned.toLocaleString()} pts</div>
                             </div>
                             <div>
-                                <div className="text-[10px] text-brand-cream/60 uppercase font-bold tracking-wider">EcoShop Spent</div>
-                                <div className="text-sm font-extrabold text-amber-300 mt-0.5">{totalRedeemed.toLocaleString()} pts</div>
+                                <div className="text-[10px] text-brand-brown/60 uppercase font-bold tracking-wider">EcoShop Spent</div>
+                                <div className="text-sm font-black text-brand-brown mt-0.5">{totalRedeemed.toLocaleString()} pts</div>
                             </div>
                         </div>
 
                         <button
                             onClick={() => navigate('/shop')}
-                            className="px-6 py-3.5 bg-brand-green hover:bg-emerald-700 text-white font-extrabold text-sm rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                            className="px-6 py-3.5 bg-brand-red hover:bg-brand-brown text-white font-extrabold text-sm rounded-xl transition-colors shadow-sm active:scale-95 flex items-center justify-center gap-2"
                         >
                             <ShoppingBag size={17} />
                             <span>Redeem in EcoShop</span>
@@ -175,13 +172,13 @@ export default function EcoPointsSection({ showHeader = true, compact = false })
                 </div>
             </div>
 
-            {/* Quick Interactive Value Presets */}
-            <div className="bg-white rounded-2xl border border-brand-brown/10 p-5 shadow-xs space-y-3">
+            {/* Flat Quick Conversion Presets */}
+            <div className="bg-white rounded-2xl border border-brand-brown/10 p-5 shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-brand-brown/70">
-                        Conversion Rate: 25 EcoPoints = ₹1.00
+                    <span className="text-xs font-bold uppercase tracking-wider text-brand-brown/70">
+                        Conversion Calculator: 25 EcoPoints = ₹1.00
                     </span>
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200/60">
+                    <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200">
                         {selectedPreset} pts = ₹{(selectedPreset / POINTS_PER_RUPEE).toFixed(0)} discount
                     </span>
                 </div>
@@ -193,14 +190,14 @@ export default function EcoPointsSection({ showHeader = true, compact = false })
                             <button
                                 key={item.pts}
                                 onClick={() => setSelectedPreset(item.pts)}
-                                className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border text-center ${
+                                className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-colors border text-center ${
                                     isSelected
-                                        ? 'bg-brand-brown text-white border-brand-brown shadow-sm scale-102'
-                                        : 'bg-brand-cream/30 text-brand-brown/80 border-brand-brown/10 hover:border-brand-brown/30 hover:bg-white'
+                                        ? 'bg-brand-brown text-white border-brand-brown'
+                                        : 'bg-brand-cream/30 text-brand-brown border-brand-brown/10 hover:bg-brand-cream'
                                 }`}
                             >
                                 <div>{item.pts} pts</div>
-                                <div className={`text-[11px] font-black mt-0.5 ${isSelected ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                                <div className={`text-[11px] font-black mt-0.5 ${isSelected ? 'text-amber-200' : 'text-brand-green'}`}>
                                     ₹{item.rs} off
                                 </div>
                             </button>
@@ -209,62 +206,62 @@ export default function EcoPointsSection({ showHeader = true, compact = false })
                 </div>
             </div>
 
-            {/* How You Earn (Punchy 4-Card Grid, Clean & Minimal Text) */}
+            {/* How You Earn (4 Flat Cards with Clean Solid Colors) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-white rounded-2xl border border-brand-brown/10 p-4 shadow-xs space-y-1">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-2">
+                <div className="bg-white rounded-2xl border border-brand-brown/10 p-4 shadow-sm space-y-1">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center justify-center mb-2">
                         <Recycle size={18} />
                     </div>
-                    <div className="text-xs font-extrabold text-brand-brown">Scrap Pickup</div>
+                    <div className="text-xs font-bold text-brand-black">Scrap Pickup</div>
                     <div className="text-sm font-black text-brand-green">+50 pts</div>
-                    <div className="text-[11px] text-brand-brown/50">per completed order</div>
+                    <div className="text-[11px] text-brand-brown/60">per completed order</div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-brand-brown/10 p-4 shadow-xs space-y-1">
-                    <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center mb-2">
+                <div className="bg-white rounded-2xl border border-brand-brown/10 p-4 shadow-sm space-y-1">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center mb-2">
                         <Scan size={18} />
                     </div>
-                    <div className="text-xs font-extrabold text-brand-brown">SmartScan AI</div>
+                    <div className="text-xs font-bold text-brand-black">SmartScan AI</div>
                     <div className="text-sm font-black text-brand-orange">+25 pts</div>
-                    <div className="text-[11px] text-brand-brown/50">per verified item</div>
+                    <div className="text-[11px] text-brand-brown/60">per verified item</div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-brand-brown/10 p-4 shadow-xs space-y-1">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center mb-2">
+                <div className="bg-white rounded-2xl border border-brand-brown/10 p-4 shadow-sm space-y-1">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 flex items-center justify-center mb-2">
                         <Award size={18} />
                     </div>
-                    <div className="text-xs font-extrabold text-brand-brown">Purity Bonus</div>
-                    <div className="text-sm font-black text-blue-600">+10 to +50 pts</div>
-                    <div className="text-[11px] text-brand-brown/50">for sorted recyclables</div>
+                    <div className="text-xs font-bold text-brand-black">Purity Bonus</div>
+                    <div className="text-sm font-black text-blue-700">+10 to +50 pts</div>
+                    <div className="text-[11px] text-brand-brown/60">for sorted recyclables</div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-brand-brown/10 p-4 shadow-xs space-y-1">
-                    <div className="w-8 h-8 rounded-xl bg-red-50 text-brand-red flex items-center justify-center mb-2">
+                <div className="bg-white rounded-2xl border border-brand-brown/10 p-4 shadow-sm space-y-1">
+                    <div className="w-8 h-8 rounded-lg bg-red-50 text-brand-red border border-red-200 flex items-center justify-center mb-2">
                         <ShoppingBag size={18} />
                     </div>
-                    <div className="text-xs font-extrabold text-brand-brown">EcoShop Savings</div>
+                    <div className="text-xs font-bold text-brand-black">EcoShop Savings</div>
                     <div className="text-sm font-black text-brand-red">25 pts = ₹1</div>
-                    <div className="text-[11px] text-brand-brown/50">applied at checkout</div>
+                    <div className="text-[11px] text-brand-brown/60">applied at checkout</div>
                 </div>
             </div>
 
             {/* Single Compact Notice */}
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-900">
-                <ShieldCheck size={16} className="text-amber-700 flex-shrink-0" />
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-brand-cream/60 border border-brand-brown/15 text-xs text-brand-brown">
+                <ShieldCheck size={16} className="text-brand-brown flex-shrink-0" />
                 <span className="font-medium">
-                    <strong className="font-bold">EcoShop Exclusive:</strong> EcoPoints cannot be withdrawn or converted to cash. They can only be used to get instant discounts on EcoShop orders.
+                    <strong className="font-bold">EcoShop Exclusive:</strong> EcoPoints cannot be withdrawn or converted to cash. They are applied directly for discounts on EcoShop purchases.
                 </span>
             </div>
 
             {/* Points Activity History */}
             {!compact && (
-                <div className="bg-white rounded-2xl border border-brand-brown/10 p-5 shadow-xs space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-brand-brown/5">
+                <div className="bg-white rounded-2xl border border-brand-brown/10 p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-brand-brown/10">
                         <div className="flex items-center gap-2">
                             <History size={16} className="text-brand-brown/60" />
-                            <h3 className="text-sm font-bold text-brand-brown">Points Activity</h3>
+                            <h3 className="text-sm font-bold text-brand-black">Points Activity</h3>
                         </div>
-                        <span className="text-[11px] font-bold text-brand-brown/50">
+                        <span className="text-[11px] font-bold text-brand-brown/60">
                             {transactions.length} entries
                         </span>
                     </div>
@@ -272,8 +269,8 @@ export default function EcoPointsSection({ showHeader = true, compact = false })
                     {transactions.length === 0 ? (
                         <div className="text-center py-8 text-brand-brown/50 space-y-1">
                             <Coins size={28} className="mx-auto text-brand-brown/30" />
-                            <p className="text-xs font-bold text-brand-brown">No transactions yet</p>
-                            <p className="text-[11px] text-brand-brown/50">
+                            <p className="text-xs font-bold text-brand-black">No transactions yet</p>
+                            <p className="text-[11px] text-brand-brown/60">
                                 Recycle scrap or scan items to earn your first EcoPoints!
                             </p>
                         </div>
@@ -289,12 +286,12 @@ export default function EcoPointsSection({ showHeader = true, compact = false })
                                     <div key={tx.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                                         <div className="flex items-center gap-2.5 min-w-0">
                                             <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                                isPositive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-brand-red'
+                                                isPositive ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-brand-red border border-red-200'
                                             }`}>
                                                 {isPositive ? <TrendingUp size={14} /> : <ShoppingBag size={14} />}
                                             </div>
                                             <div className="min-w-0">
-                                                <span className="font-bold text-brand-brown truncate block">
+                                                <span className="font-bold text-brand-black truncate block">
                                                     {tx.title || (isPositive ? 'EcoPoints Earned' : 'EcoShop Discount')}
                                                 </span>
                                                 <span className="text-[10px] text-brand-brown/50">
@@ -307,7 +304,7 @@ export default function EcoPointsSection({ showHeader = true, compact = false })
                                             <span className={`font-black ${isPositive ? 'text-brand-green' : 'text-brand-red'}`}>
                                                 {isPositive ? `+${tx.points}` : tx.points} pts
                                             </span>
-                                            <span className="text-[10px] text-brand-brown/50 ml-1.5 font-bold">
+                                            <span className="text-[10px] text-brand-brown/60 ml-1.5 font-bold">
                                                 (₹{(Math.abs(tx.points || 0) / POINTS_PER_RUPEE).toFixed(0)})
                                             </span>
                                         </div>

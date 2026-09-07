@@ -5,7 +5,7 @@ import { analyzeImageWithNvidia } from '../services/nvidia';
 import { 
     Upload, Camera, Loader2, ArrowRight, AlertCircle, X, 
     Sparkles, CheckCircle2, RefreshCw, FileText, 
-    Layers, ShieldCheck, Check
+    Layers, ShieldCheck, Check, ShieldAlert
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AnalysisResult from '../components/AnalysisResult';
@@ -13,6 +13,7 @@ import RestrictionPopup from '../components/RestrictionPopup';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import { doc, setDoc, serverTimestamp, collection, updateDoc, increment, addDoc } from 'firebase/firestore';
+import { checkHazardousWaste } from '../utils/hazardousCheck';
 
 const MATERIAL_OPTIONS = [
     "Auto-Detect", "Plastic", "Cardboard / Paper", "Metal & Cans", 
@@ -85,6 +86,7 @@ export default function SmartScan() {
     const [showRestriction, setShowRestriction] = useState(false);
     const [restrictionCategory, setRestrictionCategory] = useState(null);
     const [restrictionReason, setRestrictionReason] = useState(null);
+    const [restrictionGuidance, setRestrictionGuidance] = useState(null);
 
     const navigate = useNavigate();
     const { currentUser } = useAuth();
@@ -152,6 +154,16 @@ export default function SmartScan() {
             return;
         }
 
+        // Instant Pre-Check for Hazardous content in user notes/description
+        const preCheck = checkHazardousWaste(userDescription);
+        if (preCheck) {
+            setRestrictionCategory(preCheck.category);
+            setRestrictionReason(preCheck.reason);
+            setRestrictionGuidance(preCheck.guidance);
+            setShowRestriction(true);
+            return;
+        }
+
         setCurrentStep('scanning');
         setStatusText('Scanning with NVIDIA AI...');
         setError('');
@@ -189,8 +201,21 @@ export default function SmartScan() {
 
             // Check if restricted
             if (parsedNvidia.valid === false) {
-                setRestrictionCategory(parsedNvidia.refusal_category);
-                setRestrictionReason(parsedNvidia.refusal_reason);
+                const hazInfo = checkHazardousWaste(parsedNvidia.detected_item || parsedNvidia.refusal_reason || parsedNvidia.analysis || parsedNvidia.refusal_category);
+                setRestrictionCategory(hazInfo ? hazInfo.category : (parsedNvidia.refusal_category || "Upload Restricted"));
+                setRestrictionReason(hazInfo ? hazInfo.reason : (parsedNvidia.refusal_reason || "This image cannot be accepted for recycling."));
+                setRestrictionGuidance(hazInfo ? hazInfo.guidance : null);
+                setShowRestriction(true);
+                setCurrentStep('upload');
+                return;
+            }
+
+            // Check detected item against hazardous keywords
+            const itemHazCheck = checkHazardousWaste(parsedNvidia.detected_item);
+            if (itemHazCheck) {
+                setRestrictionCategory(itemHazCheck.category);
+                setRestrictionReason(itemHazCheck.reason);
+                setRestrictionGuidance(itemHazCheck.guidance);
                 setShowRestriction(true);
                 setCurrentStep('upload');
                 return;
@@ -217,10 +242,55 @@ export default function SmartScan() {
             setCurrentStep('questionnaire');
 
         } catch (err) {
-            console.error("NVIDIA Scan Error:", err);
-            setError(err.message || 'Analysis failed. Please try again.');
-            setCurrentStep('upload');
+            console.warn("NVIDIA Scan Error, falling back to questionnaire:", err);
+            const initialMaterial = userMaterial !== 'Auto-Detect' ? userMaterial : "Plastic";
+            const initialClean = userCondition.includes("Dirt") ? "Dirty / Wash Needed" : "Clean & Dry";
+            const initialWeight = userWeight.includes("0.5 - 2") ? "1.0" : userWeight.includes("< 0.5") ? "0.5" : "2.0";
+
+            setNvidiaData({
+                detected_item: userDescription || "Scrap Item",
+                primary_material: initialMaterial,
+                estimated_weight_kg: parseFloat(initialWeight),
+                cleanliness: initialClean
+            });
+            setVerifiedObjectName(userDescription || "Scrap Item");
+            setVerifiedMaterial(initialMaterial);
+            setVerifiedCleanliness(initialClean);
+            setVerifiedSafety(userCondition.includes("Electronics") ? "Has Electronics / Batteries" : "Safe Scrap");
+            setVerifiedWeight(initialWeight);
+            setVerifiedGoal("Home Organizers");
+            setCurrentStep('questionnaire');
         }
+    };
+
+    // Direct Questionnaire Entry (without waiting for AI scan)
+    const handleDirectQuestionnaire = () => {
+        const hazCheck = checkHazardousWaste(userDescription);
+        if (hazCheck) {
+            setRestrictionCategory(hazCheck.category);
+            setRestrictionReason(hazCheck.reason);
+            setRestrictionGuidance(hazCheck.guidance);
+            setShowRestriction(true);
+            return;
+        }
+
+        const initialMaterial = userMaterial !== 'Auto-Detect' ? userMaterial : "Plastic";
+        const initialClean = userCondition.includes("Dirt") ? "Dirty / Wash Needed" : "Clean & Dry";
+        const initialWeight = userWeight.includes("0.5 - 2") ? "1.0" : userWeight.includes("< 0.5") ? "0.5" : "2.0";
+
+        setNvidiaData({
+            detected_item: userDescription || "Scrap Item",
+            primary_material: initialMaterial,
+            estimated_weight_kg: parseFloat(initialWeight),
+            cleanliness: initialClean
+        });
+        setVerifiedObjectName(userDescription || "Scrap Item");
+        setVerifiedMaterial(initialMaterial);
+        setVerifiedCleanliness(initialClean);
+        setVerifiedSafety(userCondition.includes("Electronics") ? "Has Electronics / Batteries" : "Safe Scrap");
+        setVerifiedWeight(initialWeight);
+        setVerifiedGoal("Home Organizers");
+        setCurrentStep('questionnaire');
     };
 
     // Save completed analysis
@@ -256,27 +326,6 @@ export default function SmartScan() {
             };
 
             await setDoc(historyRef, analysisToSave);
-
-            // Award +25 EcoPoints
-            try {
-                const custRef = doc(db, "customers", currentUser.uid);
-                await updateDoc(custRef, {
-                    ecoPoints: increment(25),
-                    totalEarnedPoints: increment(25)
-                });
-
-                await addDoc(collection(db, "customers", currentUser.uid, "pointsHistory"), {
-                    title: "SmartScan AI Analysis",
-                    source: "SmartScan",
-                    points: 25,
-                    type: "earned",
-                    description: `Earned 25 EcoPoints for scanning ${verifiedObjectName || nvidiaData?.detected_item || 'scrap item'}`,
-                    createdAt: serverTimestamp()
-                });
-            } catch (ptsErr) {
-                console.warn("Points error:", ptsErr);
-            }
-
             return imageUrl;
         } catch (err) {
             console.error("Save error:", err);
@@ -286,13 +335,24 @@ export default function SmartScan() {
 
     // Phase 3: Submit Questionnaire & Generate Ideations
     const handleGenerateIdeations = async () => {
-        setCurrentStep('generating');
-        setStatusText('Generating upcycling ideas...');
-        setError('');
-
         const finalObject = verifiedObjectName.trim() || nvidiaData?.detected_item || 'Scrap Item';
         const finalMaterial = verifiedMaterial || nvidiaData?.primary_material || 'Plastic';
         const finalWeight = parseFloat(verifiedWeight) || parseFloat(nvidiaData?.estimated_weight_kg) || 1.0;
+
+        // Check if verified object or user notes mention hazardous materials
+        const hazCheck = checkHazardousWaste(finalObject) || checkHazardousWaste(verifiedObjectName) || checkHazardousWaste(userDescription);
+        if (hazCheck) {
+            setRestrictionCategory(hazCheck.category);
+            setRestrictionReason(hazCheck.reason);
+            setRestrictionGuidance(hazCheck.guidance);
+            setShowRestriction(true);
+            setCurrentStep('upload');
+            return;
+        }
+
+        setCurrentStep('generating');
+        setStatusText('Generating upcycling ideas...');
+        setError('');
 
         try {
             const verifiedContext = `
@@ -314,6 +374,7 @@ Include instructions, realistic pricing in ₹ (INR), and environmental score.
             try {
                 data = await generateIdeasFromText(verifiedContext);
             } catch (geminiError) {
+                if (geminiError.isHazardous) throw geminiError;
                 console.warn("Gemini error, trying OpenAI:", geminiError);
                 setStatusText('Using backup AI engine...');
                 data = await generateIdeasFromTextOpenAI(verifiedContext);
@@ -361,6 +422,14 @@ Include instructions, realistic pricing in ₹ (INR), and environmental score.
 
         } catch (err) {
             console.error("Ideation error:", err);
+            if (err.isHazardous) {
+                setRestrictionCategory(err.category || "Hazardous Material Prohibited");
+                setRestrictionReason(err.message || "Hazardous items cannot be accepted or upcycled.");
+                setRestrictionGuidance(err.guidance || null);
+                setShowRestriction(true);
+                setCurrentStep('upload');
+                return;
+            }
             setError(err.message || 'Failed to generate ideas. Please try again.');
             setCurrentStep('questionnaire');
         }
@@ -383,6 +452,9 @@ Include instructions, realistic pricing in ₹ (INR), and environmental score.
         setVerifiedSafety('Safe Scrap');
         setVerifiedWeight('1.0');
         setVerifiedGoal('Home Organizers');
+        setRestrictionCategory(null);
+        setRestrictionReason(null);
+        setRestrictionGuidance(null);
         setError('');
     };
 
@@ -404,6 +476,20 @@ Include instructions, realistic pricing in ₹ (INR), and environmental score.
                 {currentStep === 'upload' && !result && (
                     <div className="bg-white rounded-2xl shadow-sm border border-brand-brown/15 p-6 space-y-5">
                         
+                        {/* Safety Notice Banner */}
+                        <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3.5 flex items-start gap-3 text-xs text-amber-950">
+                            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div className="space-y-0.5 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-bold text-amber-900">Hazardous Materials Prohibited</span>
+                                    <span className="text-[10px] bg-amber-200/80 text-amber-900 px-1.5 py-0.5 rounded-md font-semibold">Safety Rule</span>
+                                </div>
+                                <p className="text-amber-800 text-[11px] leading-relaxed">
+                                    Medical waste (syringes, needles, medicines), explosives, bombs, fireworks, ammunition, firearms, and toxic chemicals cannot be scanned or accepted under waste safety regulations.
+                                </p>
+                            </div>
+                        </div>
+
                         {/* 1. Image Upload Box */}
                         <div className="border border-brand-brown/20 rounded-xl p-5 text-center bg-brand-cream/10">
                             {preview ? (
@@ -530,11 +616,21 @@ Include instructions, realistic pricing in ₹ (INR), and environmental score.
                         )}
 
                         {/* CTA */}
-                        <div className="flex justify-end pt-1">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
                             <button
+                                type="button"
+                                onClick={handleDirectQuestionnaire}
+                                className="px-4 py-2.5 bg-brand-cream/80 text-brand-brown hover:bg-brand-brown hover:text-white font-bold text-xs rounded-xl transition border border-brand-brown/15 flex items-center justify-center gap-1.5"
+                            >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>Answer Questionnaire Directly</span>
+                            </button>
+
+                            <button
+                                type="button"
                                 onClick={handleStartNvidiaScan}
                                 disabled={!preview}
-                                className="w-full sm:w-auto px-6 py-2.5 bg-brand-red text-white font-bold text-xs rounded-xl hover:bg-[#c4442b] transition shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                className="px-6 py-2.5 bg-brand-red text-white font-bold text-xs rounded-xl hover:bg-[#c4442b] transition shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                             >
                                 <Sparkles className="w-4 h-4" />
                                 <span>Scan with AI</span>
@@ -773,10 +869,14 @@ Include instructions, realistic pricing in ₹ (INR), and environmental score.
                     setImage(null);
                     setPreview(null);
                     setResult(null);
+                    setRestrictionCategory(null);
+                    setRestrictionReason(null);
+                    setRestrictionGuidance(null);
                     setCurrentStep('upload');
                 }}
                 refusalCategory={restrictionCategory}
                 refusalReason={restrictionReason}
+                guidance={restrictionGuidance}
             />
         </div>
     );

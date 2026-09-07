@@ -45,5 +45,14 @@ service cloud.firestore {
         allow read, write: if isAuthenticated();
       }
     }
+
+    // Wet Waste Subscriptions (EcoWaste)
+    match /wet_waste_subscriptions/{subId} {
+      allow read, write: if isAuthenticated();
+
+      match /{allChildren=**} {
+        allow read, write: if isAuthenticated();
+      }
+    }
   }
 }

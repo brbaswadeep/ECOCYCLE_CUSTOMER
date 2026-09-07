@@ -1,11 +1,24 @@
 // OpenAI Service - Now uses Backend Proxy (Cloudflare Functions / Vite Proxy)
 // This secures the API key and resolves CORS issues.
+import { checkHazardousWaste } from "../utils/hazardousCheck";
 
 export async function generateIdeasFromTextOpenAI(nvidiaAnalysisText) {
+  // Pre-check for hazardous content
+  const hazCheck = checkHazardousWaste(nvidiaAnalysisText);
+  if (hazCheck) {
+    const err = new Error(hazCheck.reason);
+    err.isHazardous = true;
+    err.category = hazCheck.category;
+    err.guidance = hazCheck.guidance;
+    throw err;
+  }
+
   const SYSTEM_PROMPT = `
 You are an eco-assistant.
 INPUT: "${nvidiaAnalysisText}"
 TASK: Generate JSON with 3 upcycling ideas.
+
+SAFETY: Never suggest upcycling for hazardous materials, weapons, ammunition, explosives, fireworks, or medical biohazard waste.
 
 CONSTRAINTS:
 1. JSON ONLY.

@@ -34,9 +34,16 @@ async function analyzeWithGeminiVision(base64Image, userDetails = {}) {
     const prompt = `Analyze this physical scrap or waste item for recycling and upcycling.
 ${userContextStr ? `USER CONTEXT:\n${userContextStr}\n` : ''}
 
+CRITICAL SAFETY & HAZARDOUS ITEMS CHECK:
+You MUST immediately reject and set "valid": false with "refusal_category": "Hazardous Material Prohibited" if the image depicts ANY hazardous items:
+1. Medical / Clinical Waste: Syringes, needles, scalpels, sharps, blood bags, IV sets, expired medicines, pharmaceuticals, tablets, clinical hospital waste.
+2. Explosives & Munitions: Bombs, dynamite, grenades, gunpowder, fireworks, firecrackers, ammunition, bullets, cartridges, military artillery.
+3. Weapons & Firearms: Guns, pistols, rifles, firearm components.
+4. Toxic Chemicals & Corrosives: Concentrated acids, poisons, pesticides, asbestos, radioactive materials.
+
 VALIDATION:
-Check if the image is physical recyclable/scrap waste.
-If NOT physical waste (e.g. human face, selfie, screen screenshot, living animal, food plate, empty room, completely dark/blurry), set "valid": false with "refusal_category" and "refusal_reason".
+Check if the image is safe, physical recyclable/scrap waste.
+If NOT physical waste (e.g. human face, selfie, screen screenshot, living animal, food plate, empty room, completely dark/blurry) or if HAZARDOUS/UNSAFE, set "valid": false with "refusal_category" and "refusal_reason".
 
 OUTPUT FORMAT (JSON ONLY):
 Return ONLY a valid JSON object matching:
@@ -101,11 +108,14 @@ export async function analyzeImageWithNvidia(base64Image, userDetails = {}) {
 
 ${userContextStr ? `USER-PROVIDED INFORMATION ABOUT THIS ITEM:\n${userContextStr}\n` : ''}
 
-1. VALIDATION CHECK:
-Check if the image falls into any of these RESTRICTED categories:
+1. CRITICAL SAFETY & HAZARDOUS MATERIAL RESTRICTION:
+Check if the image falls into any of these RESTRICTED or HAZARDOUS categories:
+- HAZARDOUS / MEDICAL WASTE: Syringes, needles, medical sharps, blood bags, IV tubing, pharmaceuticals, medicines, hospital waste. (STRICTLY PROHIBITED)
+- EXPLOSIVES & MUNITIONS: Bombs, grenades, dynamite, fireworks, firecrackers, ammunition, bullets, cartridges, gunpowder. (STRICTLY PROHIBITED)
+- WEAPONS: Guns, firearms, weapon parts. (STRICTLY PROHIBITED)
+- TOXIC / CHEMICAL: Strong acids, poisons, pesticides, asbestos, radioactive materials. (STRICTLY PROHIBITED)
 - No Waste Present: Selfies, Group photos, Pets, Landscapes, Food plates, App screenshots, Blank images.
 - Non-Physical Content: Text-only images, Memes, Social media screenshots, Digital artwork, Documents.
-- Unsafe / Harmful: Weapons, Illegal substances, Explicit content, Graphic violence.
 - Highly Blurry / Unreadable: Completely dark, Overexposed, Extreme motion blur, Camera covered.
 - Non-Recyclable Uploads: Human body parts, Animals, Running vehicles, Buildings, Clouds.
 
@@ -124,8 +134,8 @@ You MUST return ONLY a valid JSON object strictly matching this schema:
     "analysis": string
 }
 
-If the image is VALID waste, set "valid": true and identify accurately.
-If the image is RESTRICTED, set "valid": false, identify "refusal_category", and provide "refusal_reason".`;
+If the image is VALID safe scrap/waste, set "valid": true and identify accurately.
+If the image is HAZARDOUS or RESTRICTED, set "valid": false, specify "refusal_category" (e.g. "Hazardous Material Prohibited", "Explosives Prohibited", "Medical Waste Prohibited", "Non-Waste Image"), and explain clearly in "refusal_reason".`;
 
     const apiUrl = '/api/nvidia';
 

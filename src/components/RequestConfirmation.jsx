@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { findLocalVendors, createVendorRequest } from '../services/requestService';
-import { Loader2, MapPin, CheckCircle, AlertCircle, Store, DollarSign } from 'lucide-react';
+import { Loader2, MapPin, CheckCircle, AlertCircle, Store, DollarSign, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import { doc, updateDoc, increment, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 export default function RequestConfirmation({ item, onClose, onSuccess }) {
     const { currentUser } = useAuth();
@@ -55,6 +57,27 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
                 }, // Pass item details
                 vendors
             );
+
+            // Award +25 EcoPoints ONLY after proceeding request
+            try {
+                const custRef = doc(db, "customers", currentUser.uid);
+                await updateDoc(custRef, {
+                    ecoPoints: increment(25),
+                    totalEarnedPoints: increment(25)
+                });
+
+                await addDoc(collection(db, "customers", currentUser.uid, "pointsHistory"), {
+                    title: "Scrap Request Submitted",
+                    source: "Pickup Request",
+                    points: 25,
+                    type: "earned",
+                    description: `Claimed 25 EcoPoints for proceeding request for ${item.name || 'scrap item'}`,
+                    createdAt: serverTimestamp()
+                });
+            } catch (ptsErr) {
+                console.warn("Points award error:", ptsErr);
+            }
+
             setRequestStatus('success');
             // Wait a bit before closing or redirecting
         } catch (error) {
@@ -172,14 +195,37 @@ export default function RequestConfirmation({ item, onClose, onSuccess }) {
                         )}
 
                         {!loading && requestStatus === 'success' && (
-                            <div className="py-8 animate-in zoom-in duration-300">
-                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
+                            <div className="py-6 animate-in zoom-in duration-300 space-y-4">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm">
                                     <CheckCircle className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-xl font-bold text-brand-brown mb-2">Request Sent!</h3>
-                                <p className="text-brand-brown/70">
-                                    We've notified {vendors.length} vendors. You'll be notified when they {item.requestType === 'sell' ? 'buy' : 'accept'}.
-                                </p>
+                                <div>
+                                    <h3 className="text-xl font-black text-brand-brown">Request Submitted!</h3>
+                                    <p className="text-xs text-brand-brown/70 mt-1">
+                                        We've notified {vendors.length} local vendors. You'll be notified when they {item.requestType === 'sell' ? 'buy' : 'accept'}.
+                                    </p>
+                                </div>
+
+                                {/* Claimed EcoPoints Banner */}
+                                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between text-left shadow-xs">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0">
+                                            +25
+                                        </div>
+                                        <div>
+                                            <div className="font-black text-xs text-emerald-950 uppercase tracking-wide flex items-center gap-1.5">
+                                                <Sparkles size={13} className="text-amber-600" />
+                                                <span>25 EcoPoints Claimed!</span>
+                                            </div>
+                                            <div className="text-[11px] text-emerald-800">
+                                                Added to your balance for proceeding request
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span className="text-[11px] font-bold bg-white text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-xs flex-shrink-0">
+                                        Claimed ✓
+                                    </span>
+                                </div>
                             </div>
                         )}
 

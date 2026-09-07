@@ -9,7 +9,7 @@ import ecoshopLogo from '../assets/Ecoshop.png';
 import InvoiceModal from '../components/InvoiceModal';
 import { db } from '../firebase';
 import { 
-    collection, query, getDocs, addDoc, serverTimestamp, 
+    collection, query, getDocs, getDoc, addDoc, serverTimestamp, 
     where, doc, updateDoc, increment, deleteDoc, onSnapshot 
 } from 'firebase/firestore';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +22,7 @@ export default function Shop() {
     const [activeCategory, setActiveCategory] = useState("All");
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState("featured"); // 'featured' | 'price-low' | 'price-high' | 'recycled'
+    const [inStockOnly, setInStockOnly] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [selectedImageIndex, setSelectedImageIndex] = useState(0);
     const [modalQuantity, setModalQuantity] = useState(1);
@@ -102,34 +103,34 @@ export default function Shop() {
         return () => unsub();
     }, [currentUser]);
 
-    // Fetch Products
+    // Live real-time listener for products collection from vendors
     useEffect(() => {
-        fetchProducts();
-    }, []);
-
-    const fetchProducts = async () => {
         setLoading(true);
-        try {
-            const q = query(collection(db, "products"));
-            const snapshot = await getDocs(q);
-            const fetchedProducts = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
+        const q = query(collection(db, "products"));
+        const unsubProducts = onSnapshot(q, (snapshot) => {
+            const fetchedProducts = snapshot.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data()
             })).sort((a, b) => {
+                // In-stock products prioritized, then latest first
+                const aInStock = (Number(a.quantity) || 0) > 0 ? 1 : 0;
+                const bInStock = (Number(b.quantity) || 0) > 0 ? 1 : 0;
+                if (aInStock !== bInStock) return bInStock - aInStock;
+
                 const timeA = a.createdAt?.seconds || (a.createdAt?.toMillis ? a.createdAt.toMillis() / 1000 : 0);
                 const timeB = b.createdAt?.seconds || (b.createdAt?.toMillis ? b.createdAt.toMillis() / 1000 : 0);
                 return timeB - timeA;
             });
 
-            // Filter products with available quantity > 0
-            const availableProducts = fetchedProducts.filter(p => p.quantity && p.quantity > 0);
-            setProducts(availableProducts);
-        } catch (error) {
-            console.error("Error fetching products:", error);
-        } finally {
+            setProducts(fetchedProducts);
             setLoading(false);
-        }
-    };
+        }, (error) => {
+            console.error("Error subscribing to products:", error);
+            setLoading(false);
+        });
+
+        return () => unsubProducts();
+    }, []);
 
     // Modern light-themed toast helper
     const showToast = (message, type = 'success') => {
@@ -373,12 +374,16 @@ export default function Shop() {
                     createdAt: serverTimestamp()
                 });
 
-                // Decrement product inventory safely
+                // Decrement product inventory safely without going below 0
                 try {
                     const productRef = doc(db, "products", item.id);
-                    await updateDoc(productRef, {
-                        quantity: increment(-itemQty)
-                    });
+                    const pSnap = await getDoc(productRef);
+                    if (pSnap.exists()) {
+                        const currentQty = Number(pSnap.data().quantity) || 0;
+                        await updateDoc(productRef, {
+                            quantity: Math.max(0, currentQty - itemQty)
+                        });
+                    }
                 } catch (stockErr) {
                     console.warn("Could not update product quantity in real-time:", stockErr);
                 }
@@ -393,7 +398,6 @@ export default function Shop() {
                 : "Order placed successfully! Thank you for supporting sustainable makers.", 
                 "success"
             );
-            fetchProducts();
         } catch (error) {
             console.error("Checkout error:", error);
             showToast("Checkout failed. Please try again.", "error");
@@ -467,12 +471,16 @@ export default function Shop() {
                 createdAt: serverTimestamp()
             });
 
-            // Decrement Inventory
+            // Decrement Inventory safely
             try {
                 const productRef = doc(db, "products", selectedProduct.id);
-                await updateDoc(productRef, {
-                    quantity: increment(-qty)
-                });
+                const pSnap = await getDoc(productRef);
+                if (pSnap.exists()) {
+                    const currentQty = Number(pSnap.data().quantity) || 0;
+                    await updateDoc(productRef, {
+                        quantity: Math.max(0, currentQty - qty)
+                    });
+                }
             } catch (stockErr) {
                 console.warn("Inventory update warning:", stockErr);
             }
@@ -482,11 +490,10 @@ export default function Shop() {
             setUseEcoPointsInBuyModal(false);
             setSelectedProduct(null);
             showToast(bill.pointsDiscount > 0
-                ? `Purchase successful! Saved ₹${bill.pointsDiscount} with ${bill.pointsToRedeem} EcoPoints!`
+                ? `Purchase successful! Saved ₹${bill.pointsDiscount} with ${bill.pointsToRedeem} EcoPoints!` 
                 : "Purchase successful! Track your package in My Orders.", 
                 "success"
             );
-            fetchProducts();
         } catch (error) {
             console.error("Error creating order:", error);
             showToast("Failed to place order. Please try again.", "error");
@@ -497,12 +504,14 @@ export default function Shop() {
     // Filter & Sort Products
     const filteredProducts = useMemo(() => {
         let result = products.filter(product => {
-            const matchesCategory = activeCategory === "All" || product.category?.toLowerCase() === activeCategory.toLowerCase();
+            const matchesCategory = activeCategory === "All" || 
+                (product.category && product.category.trim().toLowerCase() === activeCategory.trim().toLowerCase());
             const matchesSearch = !searchQuery.trim() || 
                 product.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 product.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 product.vendorName?.toLowerCase().includes(searchQuery.toLowerCase());
-            return matchesCategory && matchesSearch;
+            const matchesStock = !inStockOnly || (Number(product.quantity) || 0) > 0;
+            return matchesCategory && matchesSearch && matchesStock;
         });
 
         if (sortBy === "price-low") {
@@ -511,10 +520,19 @@ export default function Shop() {
             result.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
         } else if (sortBy === "recycled") {
             result.sort((a, b) => (b.type === 'recycled' ? 1 : 0) - (a.type === 'recycled' ? 1 : 0));
+        } else {
+            result.sort((a, b) => {
+                const aInStock = (Number(a.quantity) || 0) > 0 ? 1 : 0;
+                const bInStock = (Number(b.quantity) || 0) > 0 ? 1 : 0;
+                if (aInStock !== bInStock) return bInStock - aInStock;
+                const timeA = a.createdAt?.seconds || (a.createdAt?.toMillis ? a.createdAt.toMillis() / 1000 : 0);
+                const timeB = b.createdAt?.seconds || (b.createdAt?.toMillis ? b.createdAt.toMillis() / 1000 : 0);
+                return timeB - timeA;
+            });
         }
 
         return result;
-    }, [products, activeCategory, searchQuery, sortBy]);
+    }, [products, activeCategory, searchQuery, sortBy, inStockOnly]);
 
     return (
         <>
@@ -651,19 +669,34 @@ export default function Shop() {
                             )}
                         </div>
 
-                        {/* Sort Selector */}
-                        <div className="flex items-center gap-2 self-end md:self-auto">
-                            <span className="text-xs font-bold text-brand-brown/60 uppercase tracking-wider">Sort by:</span>
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value)}
-                                className="px-3.5 py-2.5 bg-white border border-brand-brown/15 rounded-xl text-xs font-bold text-brand-brown focus:outline-none focus:ring-2 focus:ring-brand-orange/30 shadow-sm"
+                        {/* Sort & Filter Controls */}
+                        <div className="flex flex-wrap items-center gap-2 self-end md:self-auto">
+                            <button
+                                onClick={() => setInStockOnly(!inStockOnly)}
+                                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                    inStockOnly
+                                        ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm'
+                                        : 'bg-white text-brand-brown/70 border-brand-brown/15 hover:bg-brand-cream/60'
+                                }`}
+                                title="Filter in-stock items only"
                             >
-                                <option value="featured">Featured / Newest</option>
-                                <option value="price-low">Price: Low to High</option>
-                                <option value="price-high">Price: High to Low</option>
-                                <option value="recycled">100% Recycled First</option>
-                            </select>
+                                <span className={`w-2 h-2 rounded-full ${inStockOnly ? 'bg-white' : 'bg-emerald-600'}`}></span>
+                                <span>In Stock Only</span>
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-brand-brown/60 uppercase tracking-wider hidden sm:inline">Sort by:</span>
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value)}
+                                    className="px-3 py-2 bg-white border border-brand-brown/15 rounded-xl text-xs font-bold text-brand-brown focus:outline-none focus:ring-2 focus:ring-brand-orange/30 shadow-sm"
+                                >
+                                    <option value="featured">Featured / In Stock</option>
+                                    <option value="price-low">Price: Low to High</option>
+                                    <option value="price-high">Price: High to Low</option>
+                                    <option value="recycled">100% Recycled First</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -711,9 +744,11 @@ export default function Shop() {
                 ) : filteredProducts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredProducts.map(product => {
+                            const qty = Number(product.quantity) || 0;
+                            const isOutOfStock = qty <= 0;
+                            const isLowStock = !isOutOfStock && qty <= 3;
                             const cartQty = getItemCartQuantity(product.id);
                             const inCart = cartQty > 0;
-                            const isLowStock = product.quantity && product.quantity <= 3;
 
                             return (
                                 <div
@@ -728,9 +763,13 @@ export default function Shop() {
                                     {/* Product Image Area */}
                                     <div className="relative h-52 overflow-hidden bg-brand-cream/40">
                                         <img
-                                            src={product.image || (product.images && product.images[0]) || 'https://placehold.co/400x300?text=EcoProduct'}
+                                            src={product.image || (product.images && product.images[0]) || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=500&auto=format&fit=crop&q=60'}
                                             alt={product.name}
                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=500&auto=format&fit=crop&q=60';
+                                            }}
                                         />
 
                                         {/* Top Badges */}
@@ -758,13 +797,17 @@ export default function Shop() {
 
                                         {/* Stock Tag on Bottom of Image */}
                                         <div className="absolute bottom-2 left-2 pointer-events-none">
-                                            {isLowStock ? (
+                                            {isOutOfStock ? (
+                                                <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">
+                                                    Out of Stock
+                                                </span>
+                                            ) : isLowStock ? (
                                                 <span className="bg-amber-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm">
-                                                    Only {product.quantity} left
+                                                    Only {qty} left
                                                 </span>
                                             ) : (
                                                 <span className="bg-white/90 text-brand-brown/70 text-[10px] font-semibold px-2 py-0.5 rounded-md border border-brand-brown/10 shadow-sm">
-                                                    In Stock
+                                                    In Stock ({qty})
                                                 </span>
                                             )}
                                         </div>
@@ -798,7 +841,11 @@ export default function Shop() {
                                             </div>
 
                                             {/* Action Button */}
-                                            {inCart ? (
+                                            {isOutOfStock ? (
+                                                <span className="px-3 py-1.5 bg-gray-100 text-gray-400 text-xs font-bold rounded-xl border border-gray-200">
+                                                    Sold Out
+                                                </span>
+                                            ) : inCart ? (
                                                 <div 
                                                     className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-xl p-1"
                                                     onClick={(e) => e.stopPropagation()}
@@ -988,24 +1035,25 @@ export default function Shop() {
                                     <div className="flex items-center gap-2 border border-brand-brown/20 rounded-xl p-1 bg-white">
                                         <button
                                             onClick={() => setModalQuantity(prev => Math.max(1, prev - 1))}
-                                            className="p-1 text-brand-brown hover:bg-brand-cream rounded-lg transition"
-                                            disabled={modalQuantity <= 1}
+                                            className="p-1 text-brand-brown hover:bg-brand-cream rounded-lg transition disabled:opacity-40"
+                                            disabled={modalQuantity <= 1 || (Number(selectedProduct.quantity) || 0) <= 0}
                                         >
                                             <Minus size={16} />
                                         </button>
                                         <span className="text-sm font-black text-brand-brown px-3 min-w-[24px] text-center">
-                                            {modalQuantity}
+                                            {(Number(selectedProduct.quantity) || 0) <= 0 ? 0 : modalQuantity}
                                         </span>
                                         <button
                                             onClick={() => setModalQuantity(prev => {
-                                                const max = selectedProduct.quantity || 999;
+                                                const max = Number(selectedProduct.quantity) || 0;
                                                 if (prev >= max) {
                                                     showToast(`⚠️ Max stock available is ${max}`);
                                                     return prev;
                                                 }
                                                 return prev + 1;
                                             })}
-                                            className="p-1 text-brand-brown hover:bg-brand-cream rounded-lg transition"
+                                            className="p-1 text-brand-brown hover:bg-brand-cream rounded-lg transition disabled:opacity-40"
+                                            disabled={(Number(selectedProduct.quantity) || 0) <= 0}
                                         >
                                             <Plus size={16} />
                                         </button>
@@ -1014,7 +1062,8 @@ export default function Shop() {
 
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
-                                        className="w-full py-3.5 bg-white border-2 border-brand-brown text-brand-brown rounded-xl font-bold text-sm hover:bg-brand-cream transition-all flex items-center justify-center gap-2 active:scale-95"
+                                        disabled={(Number(selectedProduct.quantity) || 0) <= 0}
+                                        className="w-full py-3.5 bg-white border-2 border-brand-brown text-brand-brown rounded-xl font-bold text-sm hover:bg-brand-cream transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                                         onClick={() => {
                                             addToCart(selectedProduct, modalQuantity);
                                             setSelectedProduct(null);
@@ -1025,10 +1074,11 @@ export default function Shop() {
                                     </button>
 
                                     <button
-                                        className="w-full py-3.5 bg-brand-brown text-white rounded-xl font-bold text-sm hover:bg-brand-black transition-all shadow-md flex items-center justify-center gap-2 active:scale-95"
+                                        disabled={(Number(selectedProduct.quantity) || 0) <= 0}
+                                        className="w-full py-3.5 bg-brand-brown text-white rounded-xl font-bold text-sm hover:bg-brand-black transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                                         onClick={() => setShowBuyModal(true)}
                                     >
-                                        <span>Buy Now • ₹{Number(selectedProduct.price) * modalQuantity}</span>
+                                        <span>{(Number(selectedProduct.quantity) || 0) <= 0 ? 'Out of Stock' : `Buy Now • ₹${Number(selectedProduct.price) * modalQuantity}`}</span>
                                     </button>
                                 </div>
                             </div>

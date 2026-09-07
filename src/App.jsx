@@ -14,6 +14,7 @@ import Profile from './pages/Profile';
 import Messages from './pages/Messages';
 import Shop from './pages/Shop';
 import EcoPoints from './pages/EcoPoints';
+import EcoWaste from './pages/EcoWaste';
 import VendorProfile from './pages/VendorProfile';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -90,6 +91,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <EcoPoints />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/ecowaste"
+              element={
+                <ProtectedRoute>
+                  <EcoWaste />
                 </ProtectedRoute>
               }
             />

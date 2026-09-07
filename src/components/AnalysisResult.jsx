@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Leaf, DollarSign, Recycle, Store, Sparkles } from 'lucide-react';
+import { Leaf, DollarSign, Recycle, Store, Sparkles, CheckCircle2 } from 'lucide-react';
 import ProductCard from './ProductCard';
 import RequestConfirmation from './RequestConfirmation';
 
@@ -139,6 +139,49 @@ export default function AnalysisResult({ result, image, imageUrl, onReset, onDon
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Left Column: Analysis Details */}
                 <div className="space-y-6">
+                    {/* Questionnaire Verification Card */}
+                    {(result.verificationAnswers || result.userProvidedDetails) && (
+                        <AnalysisCard title="Verified Questionnaire Answers">
+                            <div className="space-y-2.5 text-xs">
+                                <div className="flex items-center justify-between p-2.5 rounded-xl bg-brand-cream/30 border border-brand-brown/10">
+                                    <span className="text-brand-brown/70 font-semibold flex items-center gap-1.5">
+                                        <CheckCircle2 size={14} className="text-brand-green" />
+                                        <span>Identified Item:</span>
+                                    </span>
+                                    <strong className="text-brand-brown text-right">
+                                        {result.verificationAnswers?.object || result.waste_analysis?.detected_items?.[0]?.specific_object || 'Recyclable Scrap'}
+                                    </strong>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="p-2.5 rounded-xl bg-brand-cream/30 border border-brand-brown/10">
+                                        <div className="text-[10px] text-brand-brown/60 uppercase font-bold tracking-wider">Material</div>
+                                        <div className="font-bold text-brand-brown mt-0.5">
+                                            {result.verificationAnswers?.material || result.waste_analysis?.detected_items?.[0]?.material_type || 'Plastic'}
+                                        </div>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl bg-brand-cream/30 border border-brand-brown/10">
+                                        <div className="text-[10px] text-brand-brown/60 uppercase font-bold tracking-wider">Condition</div>
+                                        <div className="font-bold text-brand-brown mt-0.5">
+                                            {result.verificationAnswers?.cleanliness || result.quality_assessment?.cleanliness_level?.replace('_', ' ') || 'Clean & Dry'}
+                                        </div>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl bg-brand-cream/30 border border-brand-brown/10">
+                                        <div className="text-[10px] text-brand-brown/60 uppercase font-bold tracking-wider">Weight</div>
+                                        <div className="font-bold text-brand-brown mt-0.5">
+                                            {result.verificationAnswers?.weight || result.quantity_estimation?.approximate_weight_kg || 1} kg
+                                        </div>
+                                    </div>
+                                    <div className="p-2.5 rounded-xl bg-brand-cream/30 border border-brand-brown/10">
+                                        <div className="text-[10px] text-brand-brown/60 uppercase font-bold tracking-wider">Upcycling Goal</div>
+                                        <div className="font-bold text-brand-brown mt-0.5">
+                                            {result.verificationAnswers?.goal || 'Home Organizers'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </AnalysisCard>
+                    )}
+
                     <AnalysisCard title="Quality Assessment">
                         <div className="grid grid-cols-3 gap-4">
                             <div className="p-3 bg-brand-cream/30 rounded-xl">
@@ -169,20 +212,30 @@ export default function AnalysisResult({ result, image, imageUrl, onReset, onDon
                         {/* Action Button for Vendor Request */}
                         <button
                             onClick={() => handleVendorRequest(null)}
-                            className={`w-full py-4 mb-4 text-white font-bold rounded-xl hover:shadow-lg transition-all shadow-md flex items-center justify-center gap-2 animate-pulse-subtle ${canSell ? 'bg-brand-red hover:bg-[#c4442b]' : 'bg-brand-brown hover:bg-brand-black'}`}
+                            className={`w-full py-3.5 mb-2 text-white font-bold rounded-xl hover:shadow-lg transition-all shadow-md flex items-center justify-between px-4 sm:px-5 ${canSell ? 'bg-brand-red hover:bg-[#c4442b]' : 'bg-brand-brown hover:bg-brand-black'}`}
                         >
-                            <div className="bg-white/20 p-2 rounded-lg">
-                                <Store className="w-5 h-5" />
+                            <div className="flex items-center gap-3">
+                                <div className="bg-white/20 p-2 rounded-lg">
+                                    <Store className="w-5 h-5" />
+                                </div>
+                                <div className="flex flex-col items-start leading-tight">
+                                    <span className="text-xs uppercase tracking-wider opacity-90">
+                                        {canSell ? 'Sell Directly' : 'Vendor Options'}
+                                    </span>
+                                    <span className="text-base sm:text-lg font-black">
+                                        {estimatedValue > 0 ? `Get ₹${estimatedValue} Cash` : (canSell ? 'Get Best Quote' : 'Sell / Request Pickup')}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="flex flex-col items-start leading-tight">
-                                <span className="text-xs uppercase tracking-wider opacity-90">
-                                    {canSell ? 'Sell Directly' : 'Vendor Options'}
-                                </span>
-                                <span className="text-lg">
-                                    {estimatedValue > 0 ? `Get ₹${estimatedValue} Cash` : (canSell ? 'Get Best Quote' : 'Sell / Request Pickup')}
-                                </span>
-                            </div>
+
+                            <span className="bg-amber-400 text-brand-black text-[11px] font-black px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-xs flex-shrink-0">
+                                <Sparkles size={12} />
+                                <span>+25 pts on request</span>
+                            </span>
                         </button>
+                        <div className="text-[11px] text-center text-brand-brown/60 font-medium mb-3">
+                            Proceed with vendor request to claim your 25 EcoPoints.
+                        </div>
                     </AnalysisCard>
                 </div>
 
