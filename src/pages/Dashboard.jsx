@@ -457,60 +457,6 @@ export default function Dashboard() {
                             )}
                         </div>
                     </div>
-
-                    {/* Quick Features Row (3 Balanced Cards) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <Link 
-                            to="/smart-scan" 
-                            className="bg-white p-4.5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between"
-                        >
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="w-9 h-9 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
-                                    <Scan className="w-4.5 h-4.5" />
-                                </div>
-                                <h4 className="font-bold text-brand-black text-sm group-hover:text-brand-red transition-colors flex items-center gap-1">
-                                    SmartScan AI <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </h4>
-                            </div>
-                            <p className="text-xs text-brand-brown/60 leading-relaxed">
-                                AI photo scanner with 5-step cross-verification questionnaires.
-                            </p>
-                        </Link>
-
-                        <Link 
-                            to="/ecowaste" 
-                            className="bg-white p-4.5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between"
-                        >
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
-                                    <Leaf className="w-4.5 h-4.5" />
-                                </div>
-                                <h4 className="font-bold text-brand-black text-sm group-hover:text-emerald-800 transition-colors flex items-center gap-1">
-                                    EcoWaste Pickup <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </h4>
-                            </div>
-                            <p className="text-xs text-brand-brown/60 leading-relaxed">
-                                Daily wet waste doorstep collection @ ₹0.50/kg subscription.
-                            </p>
-                        </Link>
-
-                        <Link 
-                            to="/shop" 
-                            className="bg-white p-4.5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md transition-all group flex flex-col justify-between"
-                        >
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="w-9 h-9 rounded-xl bg-brand-orange/15 text-brand-brown flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
-                                    <ShoppingBag className="w-4.5 h-4.5" />
-                                </div>
-                                <h4 className="font-bold text-brand-black text-sm group-hover:text-brand-brown transition-colors flex items-center gap-1">
-                                    EcoShop Store <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </h4>
-                            </div>
-                            <p className="text-xs text-brand-brown/60 leading-relaxed">
-                                Handcrafted goods from makers with EcoPoints discounts.
-                            </p>
-                        </Link>
-                    </div>
                 </div>
 
                 {/* Right (1 Column): Profile Card & Eco Impact Summary */}
@@ -577,9 +523,9 @@ export default function Dashboard() {
                     </div>
 
                     {/* Green Tip Card */}
-                    <div className="bg-emerald-50/70 rounded-2xl border border-emerald-200/60 p-5 text-emerald-950">
+                    <div className="bg-emerald-50/70 rounded-2xl border border-emerald-200/60 p-5 text-emerald-950 shadow-sm">
                         <div className="flex items-center gap-2.5 mb-2">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0">
                                 <Leaf className="w-4 h-4" />
                             </div>
                             <h4 className="font-bold text-sm text-emerald-900">Eco Fact of the Day</h4>
@@ -589,7 +535,63 @@ export default function Dashboard() {
                         </p>
                     </div>
                 </div>
+            </div>
 
+            {/* 4. Quick Actions / Features Row (Full Width 3 Columns) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Link 
+                    to="/smart-scan" 
+                    className="bg-white p-5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md hover:border-brand-brown/20 transition-all group flex items-start gap-4"
+                >
+                    <div className="w-11 h-11 rounded-xl bg-brand-red/10 text-brand-red flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                        <Scan className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-brand-black text-sm group-hover:text-brand-red transition-colors flex items-center gap-1.5">
+                            SmartScan AI 
+                            <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                        </h4>
+                        <p className="text-xs text-brand-brown/60 mt-1 leading-relaxed">
+                            AI photo scanner with 5-step cross-verification questionnaires.
+                        </p>
+                    </div>
+                </Link>
+
+                <Link 
+                    to="/ecowaste" 
+                    className="bg-white p-5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md hover:border-brand-brown/20 transition-all group flex items-start gap-4"
+                >
+                    <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                        <Leaf className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-brand-black text-sm group-hover:text-emerald-800 transition-colors flex items-center gap-1.5">
+                            EcoWaste Pickup 
+                            <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                        </h4>
+                        <p className="text-xs text-brand-brown/60 mt-1 leading-relaxed">
+                            Daily wet waste doorstep collection @ ₹0.50/kg subscription.
+                        </p>
+                    </div>
+                </Link>
+
+                <Link 
+                    to="/shop" 
+                    className="bg-white p-5 rounded-2xl border border-brand-brown/10 shadow-sm hover:shadow-md hover:border-brand-brown/20 transition-all group flex items-start gap-4"
+                >
+                    <div className="w-11 h-11 rounded-xl bg-brand-orange/15 text-brand-brown flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                        <ShoppingBag className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-brand-black text-sm group-hover:text-brand-brown transition-colors flex items-center gap-1.5">
+                            EcoShop Store 
+                            <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                        </h4>
+                        <p className="text-xs text-brand-brown/60 mt-1 leading-relaxed">
+                            Handcrafted goods from makers with EcoPoints discounts.
+                        </p>
+                    </div>
+                </Link>
             </div>
         </div>
     );
